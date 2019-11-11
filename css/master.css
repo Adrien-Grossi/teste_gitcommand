@@ -1,0 +1,14 @@
+body {
+  background-color: #282828;
+  font-family: sans-serif;
+  text-align: center;
+}
+#bm {
+  background-color: rgba(0,0,0,.8);
+}
+#bmtow {
+  background-color: rgba(200,0,0,.8);
+}
+#bmthree {
+  background-color: #b89946;
+}
