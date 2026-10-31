@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Table des types Pokémon – aide-mémoire Infinite Fusion</title>
+<style>
+  :root { --bg:#14161c; --card:#1e2129; --txt:#e8e8ec; --muted:#9aa0ad; --line:#2c303a; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--txt); line-height:1.4; }
+  main { max-width:1200px; margin:0 auto; padding:16px; }
+  h1 { font-size:1.5rem; margin:.2em 0; }
+  h2 { font-size:1.15rem; margin:1.6em 0 .5em; border-bottom:1px solid var(--line); padding-bottom:.3em; }
+  p.sub { color:var(--muted); margin:.2em 0 1em; }
+  .t { display:inline-block; padding:2px 8px; border-radius:6px; font-size:.8rem; font-weight:700; color:#fff; text-shadow:0 1px 1px rgba(0,0,0,.45); white-space:nowrap; margin:2px; }
+  /* Grand tableau */
+  .scroll { overflow:auto; border:1px solid var(--line); border-radius:8px; max-height:80vh; }
+  table.chart { border-collapse:collapse; font-size:.8rem; }
+  table.chart th, table.chart td { border:1px solid var(--line); text-align:center; min-width:34px; height:30px; padding:0; }
+  table.chart thead th { position:sticky; top:0; z-index:2; background:var(--card); }
+  table.chart thead th .t { writing-mode:vertical-rl; transform:rotate(180deg); padding:6px 2px; margin:2px 0; }
+  table.chart tbody th { position:sticky; left:0; z-index:1; background:var(--card); text-align:right; padding:0 4px; }
+  table.chart thead th.corner { left:0; z-index:3; font-size:.7rem; color:var(--muted); padding:4px; }
+  td.x2 { background:#2e8b3e; color:#fff; font-weight:700; }
+  td.x05 { background:#a2342b; color:#fff; font-weight:700; }
+  td.x0 { background:#000; color:#ccc; font-weight:700; }
+  td.x1 { color:transparent; }
+  table.chart tr:hover td, table.chart td.hl { outline:2px solid rgba(255,255,255,.35); outline-offset:-2px; }
+  .legend { display:flex; flex-wrap:wrap; gap:12px; margin:10px 0; font-size:.85rem; color:var(--muted); }
+  .legend span b { display:inline-block; width:28px; text-align:center; border-radius:4px; color:#fff; margin-right:4px; }
+  /* Fiches par type */
+  .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px; }
+  .card { background:var(--card); border-radius:10px; padding:12px; border-top:5px solid; }
+  .card h3 { margin:0 0 8px; font-size:1.05rem; }
+  .row { margin:6px 0; font-size:.85rem; }
+  .row .lbl { display:block; color:var(--muted); font-size:.75rem; text-transform:uppercase; letter-spacing:.04em; }
+  .none { color:var(--muted); font-style:italic; font-size:.8rem; }
+  /* Calculateur fusion */
+  .calc { background:var(--card); border-radius:10px; padding:14px; }
+  .calc select { font-size:1rem; padding:6px 8px; border-radius:6px; background:#2a2e38; color:var(--txt); border:1px solid var(--line); margin:4px 8px 4px 0; }
+  .note { color:var(--muted); font-size:.85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Table des types Pokémon</h1>
+  <p class="sub">Aide-mémoire pour <b>Pokémon Infinite Fusion</b> (table moderne, avec le type Fée).</p>
+
+  <h2>🧮 Calculateur pour ta fusion (double type)</h2>
+  <div class="calc">
+    <label>Type 1 <select id="d1"></select></label>
+    <label>Type 2 <select id="d2"></select></label>
+    <div id="calcOut"></div>
+    <p class="note">Dans Infinite Fusion, la fusion prend en général le type principal de la tête et le type secondaire (ou principal s'il n'en a qu'un) du corps. Les multiplicateurs des deux types se multiplient : ×2 × ×2 = ×4, ×2 × ×0,5 = ×1, etc.</p>
+  </div>
+
+  <h2>📋 Fiches par type</h2>
+  <div class="cards" id="cards"></div>
+
+  <h2>📊 Tableau complet</h2>
+  <p class="note">Ligne = type de l'<b>attaque</b> · Colonne = type du Pokémon qui <b>défend</b>.</p>
+  <div class="legend">
+    <span><b style="background:#2e8b3e">2</b>Super efficace</span>
+    <span><b style="background:#a2342b">½</b>Pas très efficace</span>
+    <span><b style="background:#000">0</b>Aucun effet</span>
+    <span>Case vide = dégâts normaux</span>
+  </div>
+  <div class="scroll"><table class="chart" id="chart"></table></div>
+</main>
+
+<script>
+const TYPES = [
+  ["normal","Normal","#9fa19f"],["fire","Feu","#e62829"],["water","Eau","#2980ef"],
+  ["electric","Électrik","#e0b800"],["grass","Plante","#3fa129"],["ice","Glace","#3dcef3"],
+  ["fighting","Combat","#ff8000"],["poison","Poison","#9141cb"],["ground","Sol","#915121"],
+  ["flying","Vol","#81b9ef"],["psychic","Psy","#ef4179"],["bug","Insecte","#91a119"],
+  ["rock","Roche","#afa981"],["ghost","Spectre","#704170"],["dragon","Dragon","#5060e1"],
+  ["dark","Ténèbres","#624d4e"],["steel","Acier","#60a1b8"],["fairy","Fée","#ef70ef"]
+];
+// attaquant -> { défenseur: multiplicateur } (seulement les valeurs ≠ 1)
+const CHART = {
+  normal:{rock:.5,ghost:0,steel:.5},
+  fire:{fire:.5,water:.5,grass:2,ice:2,bug:2,rock:.5,dragon:.5,steel:2},
+  water:{fire:2,water:.5,grass:.5,ground:2,rock:2,dragon:.5},
+  electric:{water:2,electric:.5,grass:.5,ground:0,flying:2,dragon:.5},
+  grass:{fire:.5,water:2,grass:.5,poison:.5,ground:2,flying:.5,bug:.5,rock:2,dragon:.5,steel:.5},
+  ice:{fire:.5,water:.5,grass:2,ice:.5,ground:2,flying:2,dragon:2,steel:.5},
+  fighting:{normal:2,ice:2,poison:.5,flying:.5,psychic:.5,bug:.5,rock:2,ghost:0,dark:2,steel:2,fairy:.5},
+  poison:{grass:2,poison:.5,ground:.5,rock:.5,ghost:.5,steel:0,fairy:2},
+  ground:{fire:2,electric:2,grass:.5,poison:2,flying:0,bug:.5,rock:2,steel:2},
+  flying:{electric:.5,grass:2,fighting:2,bug:2,rock:.5,steel:.5},
+  psychic:{fighting:2,poison:2,psychic:.5,dark:0,steel:.5},
+  bug:{fire:.5,grass:2,fighting:.5,poison:.5,flying:.5,psychic:2,ghost:.5,dark:2,steel:.5,fairy:.5},
+  rock:{fire:2,ice:2,fighting:.5,ground:.5,flying:2,bug:2,steel:.5},
+  ghost:{normal:0,psychic:2,ghost:2,dark:.5},
+  dragon:{dragon:2,steel:.5,fairy:0},
+  dark:{fighting:.5,psychic:2,ghost:2,dark:.5,fairy:.5},
+  steel:{fire:.5,water:.5,electric:.5,ice:2,rock:2,steel:.5,fairy:2},
+  fairy:{fire:.5,fighting:2,poison:.5,dragon:2,dark:2,steel:.5}
+};
+const eff = (a,d) => (CHART[a][d] ?? 1);
+const NAME = Object.fromEntries(TYPES.map(t=>[t[0],t]));
+const badge = k => `<span class="t" style="background:${NAME[k][2]}">${NAME[k][1]}</span>`;
+const list = (arr, mult) => arr.length ? arr.map(k => badge(k) + (mult ? `<small>${mult(k)}</small>` : "")).join("") : '<span class="none">aucun</span>';
+
+// Grand tableau
+let h = '<thead><tr><th class="corner">ATT ↓ / DEF →</th>' + TYPES.map(t=>`<th>${badge(t[0])}</th>`).join("") + '</tr></thead><tbody>';
+for (const [a] of TYPES) {
+  h += `<tr><th>${badge(a)}</th>`;
+  for (const [d] of TYPES) {
+    const m = eff(a,d);
+    const cls = m===2?"x2":m===.5?"x05":m===0?"x0":"x1";
+    const txt = m===2?"2":m===.5?"½":m===0?"0":"1";
+    h += `<td class="${cls}" title="${NAME[a][1]} → ${NAME[d][1]} : ×${String(m).replace('.',',')}">${txt}</td>`;
+  }
+  h += '</tr>';
+}
+document.getElementById("chart").innerHTML = h + '</tbody>';
+
+// Fiches
+const keys = TYPES.map(t=>t[0]);
+document.getElementById("cards").innerHTML = TYPES.map(([k,n,c]) => {
+  const strong  = keys.filter(d => eff(k,d)===2);
+  const weakAtk = keys.filter(d => eff(k,d)===.5);
+  const noAtk   = keys.filter(d => eff(k,d)===0);
+  const weakTo  = keys.filter(a => eff(a,k)===2);
+  const resists = keys.filter(a => eff(a,k)===.5);
+  const immune  = keys.filter(a => eff(a,k)===0);
+  return `<div class="card" style="border-color:${c}">
+    <h3>${badge(k)}</h3>
+    <div class="row"><span class="lbl">⚔️ Ses attaques sont super efficaces sur</span>${list(strong)}</div>
+    <div class="row"><span class="lbl">🛡️ Faible contre (prend ×2)</span>${list(weakTo)}</div>
+    <div class="row"><span class="lbl">💪 Résiste à (prend ×½)</span>${list(resists)}</div>
+    ${immune.length?`<div class="row"><span class="lbl">🚫 Immunisé contre</span>${list(immune)}</div>`:""}
+    <div class="row"><span class="lbl">😕 Ses attaques sont peu efficaces sur</span>${list(weakAtk)}${noAtk.length?` · <b>sans effet :</b> ${list(noAtk)}`:""}</div>
+  </div>`;
+}).join("");
+
+// Calculateur
+const s1 = document.getElementById("d1"), s2 = document.getElementById("d2");
+s1.innerHTML = TYPES.map(t=>`<option value="${t[0]}">${t[1]}</option>`).join("");
+s2.innerHTML = '<option value="">— aucun —</option>' + s1.innerHTML;
+s1.value = "fire"; s2.value = "flying";
+function calc() {
+  const a = s1.value, b = s2.value && s2.value!==a ? s2.value : null;
+  const m = x => eff(x,a) * (b ? eff(x,b) : 1);
+  const g = v => keys.filter(x => m(x)===v);
+  const groups = [["😱 Prend ×4",g(4)],["🛡️ Prend ×2",g(2)],["💪 Prend ×½",g(.5)],["🧱 Prend ×¼",g(.25)],["🚫 Immunisé (×0)",g(0)]];
+  document.getElementById("calcOut").innerHTML = groups.filter(x=>x[1].length)
+    .map(([l,arr]) => `<div class="row"><span class="lbl">${l}</span>${list(arr)}</div>`).join("");
+}
+s1.onchange = s2.onchange = calc; calc();
+</script>
+</body>
+</html>
