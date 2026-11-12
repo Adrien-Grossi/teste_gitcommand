@@ -243,7 +243,7 @@ input, select {
     ]},
     { id: "boissons", name: "Boissons", items: [
       ["Pack de Vittel", "6 L"], ["Pack de Cristalline"], ["Pack de Coca Zero"], ["Pack de 7Up Light"],
-      ["Jus d'orange", "×1"], ["Jus de pêche"], ["Pack de lait"], ["Vin blanc"]
+      ["Jus d'orange", "×1"], ["Jus de pêche"], ["Pack de lait"], ["Vin blanc"], ["Vin rouge"]
     ]},
     { id: "jelly", name: "Animaux · Jelly", items: [
       ["Croquettes"], ["Bâtons pour les dents"], ["Boîtes de pâtée", "×1"], ["Haricots verts", "×6"]
@@ -279,11 +279,15 @@ input, select {
 
   function slug(s) { return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-"); }
 
+  // Noms des articles de base : un ajout perso du même nom n'est pas affiché en double.
+  var BASE = {};
+  AISLES.forEach(function (a) { a.items.forEach(function (it) { BASE[slug(it[0])] = true; }); });
+
   // Construit la liste complète : articles de base + ajouts perso.
   function aisles() {
     return AISLES.map(function (a) {
       var items = a.items.map(function (it) { return { id: a.id + ":" + slug(it[0]), name: it[0], qty: it[1] || "", note: it[2] || "" }; });
-      state.custom.forEach(function (c) { if (c.aisle === a.id) items.push({ id: c.id, name: c.name, qty: "", note: "ajouté", custom: true }); });
+      state.custom.forEach(function (c) { if (c.aisle === a.id && !BASE[slug(c.name)]) items.push({ id: c.id, name: c.name, qty: "", note: "ajouté", custom: true }); });
       return { id: a.id, name: a.name, hint: a.hint, items: items };
     });
   }
