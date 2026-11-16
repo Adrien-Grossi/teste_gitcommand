@@ -799,7 +799,19 @@
       '<span class="lab-color' + (i === selLight ? " sel" : "") + '"><input type="color" value="' + l.color + '" data-lc="' + i + '" aria-label="Couleur de la lumière ' + (i + 1) + '">' +
       '<button type="button" data-lrm="' + i + '" aria-label="Retirer la lumière ' + (i + 1) + '">×</button></span>').join("") +
       (lights.length < 3 ? '<button class="pill" type="button" data-ladd>+ Lumière</button>' : "");
-    const l = lights[selLight];
+    drawLightSliders();
+  }
+  // Choisir une lumière : on change seulement la sélection et ses curseurs. On ne remplace JAMAIS
+  // la liste des pastilles ici, sinon le sélecteur de couleur natif ouvert dessus serait détruit.
+  function selectLight(i) {
+    if (i === selLight) return;
+    selLight = i;
+    $("lightPad").querySelectorAll(".lightdot").forEach((d) => d.classList.toggle("sel", +d.dataset.li === i));
+    $("lightList").querySelectorAll(".lab-color").forEach((d, k) => d.classList.toggle("sel", k === i));
+    drawLightSliders();
+  }
+  function drawLightSliders() {
+    const l = state.glass.lights[selLight];
     $("labLight").innerHTML = l ? '<p class="small">Lumière ' + (selLight + 1) + "</p>" + LIGHT_SLIDERS.map((c) =>
       '<label class="lab-row" for="labL-' + c.key + '"><span>' + c.label + " <output>" + c.show(l[c.key]) + "</output></span>" +
       '<input type="range" id="labL-' + c.key + '" data-lkey="' + c.key + '" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '" value="' + l[c.key] + '"></label>').join("")
@@ -816,7 +828,7 @@
   }
   $("lightPad").addEventListener("pointerdown", (e) => {
     const dot = e.target.closest("[data-li]");
-    if (dot && +dot.dataset.li !== selLight) { selLight = +dot.dataset.li; drawLights(); }
+    if (dot) selectLight(+dot.dataset.li);
     $("lightPad").setPointerCapture(e.pointerId); moveLight(e);
   });
   $("lightPad").addEventListener("pointermove", (e) => { if (e.buttons) moveLight(e); });
@@ -832,7 +844,12 @@
       state.glass[c.key] = +t.value;
       $("labOut-" + c.key).textContent = c.show(+t.value);
     } else if (t.dataset.ci) state.glass.colors[+t.dataset.ci] = t.value;
-    else if (t.dataset.lc) { state.glass.lights[+t.dataset.lc].color = t.value; drawLights(); }
+    else if (t.dataset.lc) {
+      const i = +t.dataset.lc;
+      state.glass.lights[i].color = t.value;
+      const dot = $("lightPad").querySelector('[data-li="' + i + '"]');
+      if (dot) dot.style.setProperty("--lc", t.value);   // le point du pavé prend la couleur choisie
+    }
     else if (t.dataset.lkey) {
       const c = LIGHT_SLIDERS.find((x) => x.key === t.dataset.lkey);
       state.glass.lights[selLight][c.key] = +t.value;
@@ -847,7 +864,7 @@
     else if (e.target.closest("[data-rm]")) g.colors.splice(+e.target.closest("[data-rm]").dataset.rm, 1);
     else if (e.target.closest("[data-ladd]")) { g.lights.push({ x: 0.5, y: 0.4, color: "#ffffff", power: 0.8, size: 0.35, depth: 0.5 }); selLight = g.lights.length - 1; }
     else if (e.target.closest("[data-lrm]")) g.lights.splice(+e.target.closest("[data-lrm]").dataset.lrm, 1);
-    else if (e.target.closest("#lightList .lab-color")) { selLight = [...$("lightList").querySelectorAll(".lab-color")].indexOf(e.target.closest(".lab-color")); drawLights(); return; }
+    else if (e.target.closest("#lightList .lab-color")) { selectLight([...$("lightList").querySelectorAll(".lab-color")].indexOf(e.target.closest(".lab-color"))); return; }
     else if (e.target.closest("#labReset")) state.glass = copyGlass(GLASS_DEFAULTS);
     else if (e.target.closest("#labClose")) { closeLab(); return; }
     else return;

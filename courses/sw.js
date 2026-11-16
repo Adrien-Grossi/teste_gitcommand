@@ -6,7 +6,7 @@
    2. Rappels de péremption : 2 jours avant la date, puis le jour où elle est dépassée.
    Changer CACHE à chaque mise en ligne qui modifie la liste ci-dessous.
    ========================================================================= */
-const CACHE = "courses-v27";
+const CACHE = "courses-v28";
 const APP_FILES = ["./", "index.html", "app.css", "app.js", "effects.js", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png"];
 const LEAD_DAYS = 2;
 
