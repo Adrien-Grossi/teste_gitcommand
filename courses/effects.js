@@ -415,7 +415,7 @@
       "    if (float(j) >= ncard) break;",
       // Arrondi réglable, jusqu'au galet ; plafonné à 34 px pour qu'une plaque haute (un rayon entier)
       // garde des coins de carte et ne devienne pas un galet géant.
-      "    vec2 hs = cards[j].zw * 0.5; float rj = min(mix(min(6.0, min(hs.x, hs.y)), min(hs.x, hs.y), gRound), 34.0);",
+      "    vec2 hs = cards[j].zw * 0.5; float rj = min(min(mix(min(6.0, min(hs.x, hs.y)), min(hs.x, hs.y), gRound), 34.0), crad[j]);",
       "    if (rr(pc - cards[j].xy - hs, hs, rj) < 1.0){ b = cards[j]; rad = rj; hit = true; }",
       "  }",
       "  if (!hit){ gl_FragColor = vec4(base, 1.0); return; }",
@@ -559,7 +559,9 @@
         if (el.checkVisibility && !el.checkVisibility({ visibilityProperty: true })) continue;
         let r = this.radius.get(el);
         if (r === undefined) { r = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0; this.radius.set(el, r); }
-        boxes.set([b.left, b.top, b.width, b.height], n * 4); radii[n] = r; n++;
+        // Seules les cartes d'information (.card) imposent leur propre arrondi (moins rond qu'un galet, pour
+        // laisser de la place au texte aux extrémités) ; tout le reste garde l'arrondi réglé dans l'atelier.
+        boxes.set([b.left, b.top, b.width, b.height], n * 4); radii[n] = el.matches(".card") ? r : 999; n++;
       }
       return { boxes, radii, n };
     },
