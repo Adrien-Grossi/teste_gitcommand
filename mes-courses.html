@@ -21,6 +21,8 @@
   --ok: #1f8a4c;
   --ok-soft: #dff3e6;
   --skip: #9a98a2;
+  --bad: #c2372b;
+  --warn: #a35c00;
   --font-display: "Bricolage Grotesque", "Atkinson Hyperlegible", system-ui, sans-serif;
   --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
   --radius: 14px;
@@ -28,13 +30,13 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0e0e10; --card: #18181c; --ink: #f2f1ec; --muted: #9c9aa5; --line: #2a2a30;
-    --hl: #ffd92e; --hl-ink: #121214; --ok: #4fd18a; --ok-soft: #173826; --skip: #6c6a74;
+    --hl: #ffd92e; --hl-ink: #121214; --ok: #4fd18a; --ok-soft: #173826; --skip: #6c6a74; --bad: #ff6b5e; --warn: #ffb347;
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0e0e10; --card: #18181c; --ink: #f2f1ec; --muted: #9c9aa5; --line: #2a2a30;
-  --hl: #ffd92e; --hl-ink: #121214; --ok: #4fd18a; --ok-soft: #173826; --skip: #6c6a74;
+  --hl: #ffd92e; --hl-ink: #121214; --ok: #4fd18a; --ok-soft: #173826; --skip: #6c6a74; --bad: #ff6b5e; --warn: #ffb347;
   color-scheme: dark;
 }
 
@@ -171,6 +173,57 @@ input, select {
 .toast span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .toast button { font: inherit; font-weight: 700; background: var(--hl); color: var(--hl-ink); border: 0; border-radius: 10px; padding: 10px 14px; min-height: 44px; cursor: pointer; white-space: nowrap; }
 
+/* Dates de péremption */
+.pill.accent { background: var(--hl); color: var(--hl-ink); border-color: var(--hl); font-weight: 700; }
+.dlc { display: block; font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dlc.warn { color: var(--warn); font-weight: 700; }
+.dlc.bad { color: var(--bad); font-weight: 700; }
+#urgent { margin-top: 22px; }
+#urgent .side { color: var(--ok); }
+
+.sheet {
+  position: fixed; inset: 0; z-index: 30; background: var(--bg); overflow-y: auto;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.sheet-in { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
+.sheet-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.count { font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.item-name { font-family: var(--font-display); font-size: 1.9rem; font-weight: 800; margin: 0; line-height: 1.1; text-wrap: balance; overflow-wrap: anywhere; }
+.item-sub { color: var(--muted); font-size: .95rem; margin: 0; min-height: 1.3em; }
+.datebox {
+  font-family: var(--font-display); font-size: 2.6rem; font-weight: 800; text-align: center;
+  background: var(--card); border: 2px solid var(--line); border-radius: var(--radius);
+  padding: 8px; font-variant-numeric: tabular-nums; letter-spacing: .04em;
+}
+.datebox.ok { border-color: var(--ok); }
+.datebox .ph { color: var(--line); }
+.datebox .sep { color: var(--muted); padding: 0 2px; }
+.preview { text-align: center; margin: 0; min-height: 1.4em; color: var(--muted); }
+.preview.ok { color: var(--ok); font-weight: 700; }
+.preview.err { color: var(--bad); font-weight: 700; }
+.mic {
+  display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px;
+  font: inherit; font-weight: 700; font-size: 1.05rem; border-radius: 12px; cursor: pointer;
+  border: 2px solid var(--ink); background: var(--card); color: var(--ink);
+}
+.mic svg { width: 22px; height: 22px; }
+.mic.on { background: var(--hl); color: var(--hl-ink); border-color: var(--hl); animation: pulse 1.2s ease-out infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 var(--hl); } 100% { box-shadow: 0 0 0 12px transparent; } }
+.pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.pad button {
+  font: inherit; font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; min-height: 56px;
+  border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer;
+}
+.pad button:active { background: var(--line); }
+.pad button.fn { font-family: var(--font-body); font-size: 1rem; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.nav { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 8px; margin-top: auto; }
+.btn:disabled { opacity: .35; cursor: default; }
+.btn.go { background: var(--ok); border-color: var(--ok); color: var(--bg); }
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
@@ -188,8 +241,11 @@ input, select {
     <div class="next" id="next"></div>
     <div class="toggles">
       <button class="pill" id="hideBtn" type="button" aria-pressed="true">Cacher ce qui est fait</button>
+      <button class="pill accent" id="datesBtn" type="button">Dater le stock</button>
     </div>
   </header>
+
+  <section id="urgent" hidden></section>
 
   <main id="list"></main>
 
@@ -209,6 +265,7 @@ input, select {
     <h3>Nouvelle course</h3>
     <p class="small">Décoche tout pour repartir de zéro. Les articles ajoutés restent dans la liste.</p>
     <button class="btn ghost" id="resetBtn" type="button">Tout décocher</button>
+    <p class="small"><strong>Dater le stock</strong> fait défiler ce que tu viens d'acheter et ce que tu as déjà : dis ou tape la date (2606 = 26 juin), valide, article suivant. Les dates restent quand tu décoches tout.</p>
     <p class="small">Astuce : avant de partir, appuie sur <strong>Pas besoin</strong> pour ce que tu as déjà à la maison. Au magasin, un seul appui sur la ligne = pris.</p>
   </div>
 </div>
@@ -216,6 +273,43 @@ input, select {
 <div class="toast" id="toast" hidden role="status" aria-live="polite">
   <span id="toastText"></span>
   <button type="button" id="undoBtn">Annuler</button>
+</div>
+
+<div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="lbName">
+  <div class="sheet-in">
+    <div class="sheet-top">
+      <span class="count" id="lbCount"></span>
+      <button class="pill" id="lbClose" type="button">Terminer</button>
+    </div>
+    <div>
+      <p class="item-sub" id="lbAisle"></p>
+      <h2 class="item-name" id="lbName"></h2>
+      <p class="item-sub" id="lbCurrent"></p>
+    </div>
+    <div class="datebox" id="lbDate" aria-live="polite"></div>
+    <p class="preview" id="lbPreview"></p>
+    <button class="mic" id="lbMic" type="button" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      <span id="lbMicText">Dire la date</span>
+    </button>
+    <div class="pad" id="lbPad">
+      <button type="button" data-k="1">1</button><button type="button" data-k="2">2</button><button type="button" data-k="3">3</button>
+      <button type="button" data-k="4">4</button><button type="button" data-k="5">5</button><button type="button" data-k="6">6</button>
+      <button type="button" data-k="7">7</button><button type="button" data-k="8">8</button><button type="button" data-k="9">9</button>
+      <button type="button" data-k="clr" class="fn">Effacer</button><button type="button" data-k="0">0</button><button type="button" data-k="del" class="fn" aria-label="Effacer un chiffre">⌫</button>
+    </div>
+    <div class="chips" id="lbChips">
+      <button class="pill" type="button" data-q="none">Pas de date</button>
+      <button class="pill" type="button" data-q="3">Dans 3 j</button>
+      <button class="pill" type="button" data-q="7">1 sem.</button>
+      <button class="pill" type="button" data-q="30">1 mois</button>
+    </div>
+    <div class="nav">
+      <button class="btn ghost" id="lbPrev" type="button">Retour</button>
+      <button class="btn ghost" id="lbSkip" type="button">Passer</button>
+      <button class="btn go" id="lbOk" type="button" disabled>Valider</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -273,7 +367,7 @@ input, select {
   ];
 
   var KEY = "courses-v1";
-  var state = { marks: {}, custom: [], hideDone: true };
+  var state = { marks: {}, custom: [], hideDone: true, dates: {} };
   try { var saved = JSON.parse(localStorage.getItem(KEY)); if (saved) state = Object.assign(state, saved); } catch (e) {}
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
 
@@ -318,7 +412,7 @@ input, select {
             '<span class="box">' + CHECK + '</span>' +
             '<span class="label"><span class="name">' + esc(it.name) + '</span>' +
             (it.qty ? '<span class="qty">' + esc(it.qty) + '</span>' : "") +
-            (it.note ? '<span class="note">' + esc(it.note) + '</span>' : "") + '</span>' +
+            (it.note ? '<span class="note">' + esc(it.note) + '</span>' : "") + dlcHtml(it.id) + '</span>' +
           '</button>' +
           (it.custom
             ? '<button class="side" type="button" data-act="del" aria-label="Supprimer ' + esc(it.name) + '">' + TRASH + 'Suppr.</button>'
@@ -337,12 +431,14 @@ input, select {
     var hb = document.getElementById("hideBtn");
     hb.setAttribute("aria-pressed", state.hideDone);
     hb.textContent = state.hideDone ? "Cacher ce qui est fait : oui" : "Cacher ce qui est fait : non";
+    renderUrgent();
   }
 
   // Toast « Annuler » pour rattraper un appui raté.
   var toast = document.getElementById("toast"), toastText = document.getElementById("toastText"), toastTimer, lastUndo = null;
   function showToast(text, undo) {
     lastUndo = undo; toastText.textContent = text; toast.hidden = false;
+    document.getElementById("undoBtn").hidden = !undo;
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { toast.hidden = true; lastUndo = null; }, 4000);
   }
   document.getElementById("undoBtn").addEventListener("click", function () {
@@ -427,6 +523,203 @@ input, select {
   }
   document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") wake(); });
   wake();
+
+  // ---------- Dates de péremption ----------
+  function $(id) { return document.getElementById(id); }
+  var MONTHS = ["janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet", "aout", "septembre", "octobre", "novembre", "decembre"];
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+  function today0() { var t = new Date(); t.setHours(0, 0, 0, 0); return t; }
+  function toISO(dt) { return dt.getFullYear() + "-" + pad2(dt.getMonth() + 1) + "-" + pad2(dt.getDate()); }
+  function fromISO(s) { var p = s.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function validISO(s) { return /^\d{4}-\d{2}-\d{2}$/.test(s || ""); }
+  function daysLeft(s) { return Math.round((fromISO(s) - today0()) / 864e5); }
+  function rel(n) { return n < 0 ? "périmé depuis " + (-n) + " j" : n === 0 ? "aujourd'hui" : n === 1 ? "demain" : "dans " + n + " j"; }
+  function shortDate(s) { var p = s.split("-"); return p[2] + "/" + p[1] + (+p[0] !== new Date().getFullYear() ? "/" + p[0].slice(2) : ""); }
+
+  function dlcHtml(id) {
+    var d = state.dates[id]; if (!validISO(d)) return "";
+    var n = daysLeft(d);
+    return '<span class="dlc ' + (n < 0 ? "bad" : n <= 2 ? "warn" : "") + '">À consommer : ' + shortDate(d) + " · " + rel(n) + "</span>";
+  }
+
+  // Jour + mois (+ année facultative). Sans année : la prochaine occurrence, sauf si la date vient de passer.
+  function resolve(d, m, y) {
+    if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31)) return null;
+    var t = today0();
+    if (y == null) { y = t.getFullYear(); if (new Date(y, m - 1, d) < new Date(t.getTime() - 60 * 864e5)) y++; }
+    else if (y < 100) y += 2000;
+    var dt = new Date(y, m - 1, d);
+    return dt.getMonth() === m - 1 ? toISO(dt) : null;
+  }
+  function bufToISO(b) {
+    if (b.length === 4) return resolve(+b.slice(0, 2), +b.slice(2, 4));
+    if (b.length === 6) return resolve(+b.slice(0, 2), +b.slice(2, 4), +b.slice(4, 6));
+    return null;
+  }
+  function isoToBuf(s) { var p = s.split("-"); return p[2] + p[1] + p[0].slice(2); }
+
+  // Comprend « 2606 », « 26 06 », « 26/06/27 », « 26 juin », « premier juillet 2027 »…
+  function parseSpoken(text) {
+    var t = " " + text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") + " ";
+    t = t.replace(/\b(premier|1er)\b/g, " 1 ");
+    var m = null;
+    MONTHS.forEach(function (name, i) { if (m === null && t.indexOf(name) >= 0) { m = i + 1; t = t.replace(name, "|"); } });
+    if (m !== null) {
+      var parts = t.split("|"), before = parts[0].match(/\d+/g), after = parts[1].match(/\d+/g);
+      if (!before) return null;
+      var y = after ? +after[0] : null;
+      if (y != null && !(y < 100 || (y >= 2000 && y < 2100))) y = null;
+      return resolve(+before[before.length - 1], m, y);
+    }
+    var runs = t.match(/\d+/g); if (!runs) return null;
+    var all = runs.join("");
+    if (all.length === 4 || all.length === 6) return bufToISO(all);
+    if (all.length === 8) return resolve(+all.slice(0, 2), +all.slice(2, 4), +all.slice(4));
+    if (runs.length >= 2) return resolve(+runs[0], +runs[1], runs[2] ? +runs[2] : null);
+    return null;
+  }
+
+  // Bloc « À consommer en premier » : tout ce qui périme dans 5 jours ou moins.
+  function renderUrgent() {
+    var rows = [];
+    aisles().forEach(function (a) { a.items.forEach(function (it) {
+      var d = state.dates[it.id];
+      if (validISO(d)) { var n = daysLeft(d); if (n <= 5) rows.push({ id: it.id, name: it.name, d: d, n: n }); }
+    }); });
+    rows.sort(function (a, b) { return a.n - b.n; });
+    var el = $("urgent"); el.hidden = !rows.length;
+    if (!rows.length) { el.innerHTML = ""; return; }
+    el.innerHTML = '<div class="aisle-h"><h2>À consommer en premier</h2><span class="n">' + rows.length + '</span></div><ul>' +
+      rows.map(function (r) {
+        return '<li data-id="' + esc(r.id) + '"><button class="tap" type="button" data-act="edit"><span class="label">' +
+          '<span class="name">' + esc(r.name) + '</span><span class="dlc ' + (r.n < 0 ? "bad" : r.n <= 2 ? "warn" : "") + '">' +
+          shortDate(r.d) + " · " + rel(r.n) + '</span></span></button>' +
+          '<button class="side" type="button" data-act="eaten">' + CHECK + 'Fini</button></li>';
+      }).join("") + "</ul>";
+  }
+  $("urgent").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-act]"); if (!b) return;
+    var id = b.closest("li").getAttribute("data-id");
+    if (b.getAttribute("data-act") === "edit") { openLabeler([id]); return; }
+    var prev = state.dates[id]; delete state.dates[id]; save(); render();
+    showToast("Fini : " + findName(id), function () { state.dates[id] = prev; });
+  });
+
+  // Mode étiquetage : un article à la fois.
+  var sheet = $("sheet"), lb = { queue: [], pos: 0, buf: "", msg: "", voice: false, saved: 0 };
+  function itemInfo(id) {
+    var r = null;
+    aisles().forEach(function (a) { a.items.forEach(function (it) { if (it.id === id) r = { name: it.name, qty: it.qty, aisle: a.name }; }); });
+    return r;
+  }
+  // À dater : ce qui vient d'être pris, et ce qui est « pas besoin » (déjà à la maison) sans date.
+  function stockQueue() {
+    var q = [];
+    aisles().forEach(function (a) { a.items.forEach(function (it) {
+      var m = state.marks[it.id], d = state.dates[it.id];
+      if (d === "none") return;
+      if (m === "got" || (m === "skip" && !d)) q.push(it.id);
+    }); });
+    return q;
+  }
+  function openLabeler(ids) {
+    if (!ids.length) { showToast("Rien à dater : coche d'abord ce que tu as acheté ou déjà à la maison.", null); return; }
+    lb.queue = ids; lb.pos = 0; lb.saved = 0;
+    sheet.hidden = false; document.body.style.overflow = "hidden";
+    showItem();
+  }
+  function closeLabeler() {
+    stopListening(); sheet.hidden = true; document.body.style.overflow = "";
+    save(); render();
+    if (lb.saved) showToast(lb.saved + (lb.saved > 1 ? " dates enregistrées" : " date enregistrée"), null);
+  }
+  function showItem() {
+    if (lb.pos >= lb.queue.length) { closeLabeler(); return; }
+    var id = lb.queue[lb.pos], info = itemInfo(id) || { name: "?", qty: "", aisle: "" }, d = state.dates[id];
+    $("lbCount").textContent = (lb.pos + 1) + " / " + lb.queue.length;
+    $("lbAisle").textContent = info.aisle;
+    $("lbName").textContent = info.name + (info.qty ? " · " + info.qty : "");
+    $("lbCurrent").textContent = validISO(d) ? "Date actuelle : " + shortDate(d) + " (" + rel(daysLeft(d)) + ")" : "";
+    $("lbPrev").disabled = lb.pos === 0;
+    lb.buf = ""; lb.msg = ""; drawDate();
+    if (lb.voice) listen();
+  }
+  function drawDate() {
+    var b = lb.buf, slots = b.length > 4 ? 6 : 4, h = "";
+    for (var i = 0; i < slots; i++) {
+      if (i === 2 || i === 4) h += '<span class="sep">/</span>';
+      h += i < b.length ? b[i] : '<span class="ph">' + "JJMMAA"[i] + "</span>";
+    }
+    var iso = bufToISO(b), box = $("lbDate"), pv = $("lbPreview");
+    box.innerHTML = h; box.classList.toggle("ok", !!iso);
+    $("lbOk").disabled = !iso;
+    if (iso) {
+      pv.className = "preview ok";
+      pv.textContent = fromISO(iso).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) + " · " + rel(daysLeft(iso));
+    } else if (lb.msg) { pv.className = "preview err"; pv.textContent = lb.msg; }
+    else if (b.length === 4 || b.length === 6) { pv.className = "preview err"; pv.textContent = "Cette date n'existe pas. Corrige avec ⌫."; }
+    else { pv.className = "preview"; pv.textContent = "Jour puis mois : 2606 pour le 26 juin"; }
+  }
+  function setDate(iso) {
+    var id = lb.queue[lb.pos];
+    state.dates[id] = iso; if (iso !== "none") lb.saved++;
+    save(); try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
+    lb.pos++; showItem();
+  }
+  function press(k) {
+    lb.voice = false; stopListening(); lb.msg = "";
+    if (k === "del") lb.buf = lb.buf.slice(0, -1);
+    else if (k === "clr") lb.buf = "";
+    else if (lb.buf.length < 6) lb.buf += k;
+    drawDate();
+  }
+  $("datesBtn").addEventListener("click", function () { openLabeler(stockQueue()); });
+  $("lbPad").addEventListener("click", function (e) { var k = e.target.closest("button"); if (k) press(k.getAttribute("data-k")); });
+  $("lbOk").addEventListener("click", function () { var iso = bufToISO(lb.buf); if (iso) setDate(iso); });
+  $("lbSkip").addEventListener("click", function () { lb.pos++; showItem(); });
+  $("lbPrev").addEventListener("click", function () { if (lb.pos > 0) { lb.pos--; showItem(); } });
+  $("lbClose").addEventListener("click", closeLabeler);
+  $("lbChips").addEventListener("click", function (e) {
+    var c = e.target.closest("button"); if (!c) return;
+    var q = c.getAttribute("data-q");
+    if (q === "none") { setDate("none"); return; }
+    var dt = today0(); dt.setDate(dt.getDate() + (+q)); setDate(toISO(dt));
+  });
+  document.addEventListener("keydown", function (e) {
+    if (sheet.hidden) return;
+    if (/^[0-9]$/.test(e.key)) press(e.key);
+    else if (e.key === "Backspace") press("del");
+    else if (e.key === "Enter") { e.preventDefault(); $("lbOk").click(); }
+    else if (e.key === "Escape") closeLabeler();
+  });
+
+  // Dictée : reconnaissance vocale du navigateur, sans bibliothèque.
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition, rec = null, listening = false;
+  if (SR) $("lbMic").hidden = false;
+  function setMic(on) { listening = on; $("lbMic").classList.toggle("on", on); $("lbMicText").textContent = on ? "J'écoute… dis la date" : "Dire la date"; }
+  function stopListening() { var r = rec; rec = null; if (r) { try { r.abort(); } catch (e) {} } setMic(false); }
+  function listen() {
+    stopListening();
+    var r; try { r = new SR(); } catch (e) { return; }
+    rec = r; r.lang = "fr-FR"; r.interimResults = false; r.maxAlternatives = 5;
+    r.onresult = function (ev) {
+      var alts = ev.results[0], iso = null, said = alts[0].transcript;
+      for (var i = 0; i < alts.length && !iso; i++) iso = parseSpoken(alts[i].transcript);
+      if (iso) { lb.voice = true; lb.buf = isoToBuf(iso); lb.msg = ""; }
+      else { lb.buf = ""; lb.msg = "Pas compris « " + said + " ». Redis, par exemple « 26 06 »."; }
+      drawDate();
+    };
+    r.onerror = function (ev) {
+      if (ev.error === "not-allowed" || ev.error === "service-not-allowed" || ev.error === "audio-capture") {
+        lb.voice = false; lb.msg = "Micro bloqué ici. Tape la date, ou ouvre le fichier téléchargé dans Chrome.";
+      } else if (ev.error === "no-speech") { lb.msg = "Je n'ai rien entendu. Appuie sur le micro et dis la date."; }
+      else if (ev.error !== "aborted") { lb.msg = "Le micro n'a pas marché. Tape la date."; }
+      drawDate();
+    };
+    r.onend = function () { if (rec === r) { rec = null; setMic(false); } };
+    try { r.start(); setMic(true); } catch (e) { rec = null; setMic(false); }
+  }
+  $("lbMic").addEventListener("click", function () { if (listening) stopListening(); else listen(); });
 
   render();
 })();
