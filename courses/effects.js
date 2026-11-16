@@ -176,7 +176,7 @@
   }, { passive: true });
 
   // Verre : le reflet de chaque plaque suit le doigt (variables --mx / --my lues par app.css).
-  const GLASS = ".rows li, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta";
+  const GLASS = ".rows, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta";
   const shine = (e) => {
     if (skin !== "verre" || !e.target.closest) return;
     const el = e.target.closest(GLASS); if (!el) return;
@@ -193,7 +193,7 @@
    * ce qui crée une frange irisée (diffraction). Pour chaque taille de plaque, on calcule une
    * carte de déformation (canvas) et un filtre SVG, appliqué en backdrop-filter.
    * Chrome seulement ; ailleurs, le verre dépoli défini dans app.css reste en place.          */
-  const LIQUID = ".rows li, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta, header, .tabs, .toast";
+  const LIQUID = ".rows, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta, header, .tabs, .toast";
   const SVG_NS = "http://www.w3.org/2000/svg";
   const liquid = {
     supported: (() => { try { return CSS.supports("backdrop-filter", "url(#x)") && /Chrome\//.test(navigator.userAgent); } catch (e) { return false; } })(),
@@ -359,7 +359,7 @@
    *    fond qui voyage dans le verre et ressort tout au bord, en un liseré fin de sa couleur.
    * Les éléments en verre de la page deviennent transparents (classe .gl-glass) : leur texte reste
    * net par-dessus. Si WebGL manque, les disques et le verre en CSS de app.css restent en place.   */
-  const GL_GLASS = ".rows li, .card, .pill:not(.accent), .iconbtn, .skin, .pad button, .datebox, .mic:not(.on), .btn.ghost";
+  const GL_GLASS = ".rows, .card, .pill:not(.accent), .iconbtn, .skin, .pad button, .datebox, .mic:not(.on), .btn.ghost";
   const MAX_CARDS = 32;
   const fluid = {
     canvas: null, gl: null, on: false, raf: 0, last: 0, time: 0, prevBoxes: "", radius: new WeakMap(),
@@ -413,7 +413,9 @@
       "  vec4 b = vec4(0.0); float rad = 0.0; bool hit = false;",
       "  for (int j = 0; j < " + MAX_CARDS + "; j++){",
       "    if (float(j) >= ncard) break;",
-      "    vec2 hs = cards[j].zw * 0.5; float rj = mix(min(6.0, min(hs.x, hs.y)), min(hs.x, hs.y), gRound);",   // arrondi réglable, jusqu'au galet
+      // Arrondi réglable, jusqu'au galet ; plafonné à 34 px pour qu'une plaque haute (un rayon entier)
+      // garde des coins de carte et ne devienne pas un galet géant.
+      "    vec2 hs = cards[j].zw * 0.5; float rj = min(mix(min(6.0, min(hs.x, hs.y)), min(hs.x, hs.y), gRound), 34.0);",
       "    if (rr(pc - cards[j].xy - hs, hs, rj) < 1.0){ b = cards[j]; rad = rj; hit = true; }",
       "  }",
       "  if (!hit){ gl_FragColor = vec4(base, 1.0); return; }",
@@ -422,8 +424,13 @@
       // Le profil couvre toujours toute la demi-hauteur (zR). Le réglage « bombé » ne change que la
       // forme de la courbe : 100 % et plus = dôme parfait ; en dessous, la courbe se plate au centre et se
       // raidit au bord, progressivement (exposant pp de 2 à 16). Aucun palier, donc aucun pli.
-      "  float zR = max(min(hs.x, hs.y), 1.5);",
-      "  float pp = 2.0 / clamp(gBezel, 0.125, 1.0);",
+      // Largeur du bord courbe : toute la demi-hauteur d'un petit élément, mais jamais plus de 34 px.
+      // Sur une plaque haute, le centre reste donc plat et seul le bord courbe réfracte. Le raccord entre
+      // le centre plat et le bord doit rester sans pli : l'exposant monte à 3 minimum dès que la plaque
+      // dépasse 34 px de demi-hauteur (progressivement entre 34 et 51 px).
+      "  float zR = clamp(min(hs.x, hs.y), 1.5, 34.0);",
+      "  float plateau = smoothstep(34.0, 51.0, min(hs.x, hs.y));",
+      "  float pp = mix(2.0 / clamp(gBezel, 0.125, 1.0), max(2.0 / clamp(gBezel, 0.125, 1.0), 3.0), plateau);",
       // Pente de la surface (différences finies sur le champ de hauteur) → normale.
       // Galet : arrondi = demi-hauteur, donc la distance exacte n'a pas de pli dans le bombé.
       "  float e = 1.0;",
@@ -453,6 +460,10 @@
       // Le verre absorbe un peu là où il est épais ; la lumière du fond qui voyage dans le verre
       // ressort tout au bord, en un liseré très fin de sa propre couleur.
       "  col *= 1.0 - 0.05 * bevel(inside, zR, pp) / zR;",
+      // Une grande plaque (un rayon entier) porte beaucoup de texte : on assombrit un peu son intérieur
+      // (pas son bord) pour que le texte blanc reste lisible sur les zones claires du fond. Nul sur les
+      // petits éléments, donc leur rendu ne change pas.
+      "  col *= 1.0 - 0.32 * plateau * smoothstep(0.0, 1.0, inside / zR);",
       // Reflet du décor : sur le bord penché, le verre agit comme un miroir (Fresnel : plus on le voit
       // en biais, plus il réfléchit). On y voit le décor de l'autre côté du bord, retourné.
       "  vec2 nrm = N.xy / max(length(N.xy), 1e-3);",   // sens du bord, vers l'extérieur de la carte

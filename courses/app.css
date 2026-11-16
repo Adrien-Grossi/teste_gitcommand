@@ -401,22 +401,23 @@ body.lab-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
    dans le fond, sous eux (réfraction, dispersion, reflets) ; ils deviennent donc transparents
    et seul leur contenu reste. Même liste que GL_GLASS dans effects.js. Les panneaux opaques
    (choix du style, réglages de l'atelier) gardent le verre en CSS. */
-:root.gl-glass[data-skin="verre"] :is(.rows li, .card, .pill:not(.accent), .iconbtn, .skin, .pad button, .datebox, .mic:not(.on), .btn.ghost):not(.picker *):not(.lab-body *) {
+:root.gl-glass[data-skin="verre"] :is(.rows, .card, .pill:not(.accent), .iconbtn, .skin, .pad button, .datebox, .mic:not(.on), .btn.ghost):not(.picker *):not(.lab-body *) {
   background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
   border-radius: 999px;   /* forme de galet, la même que le verre dessiné dessous */
 }
-:root.gl-glass[data-skin="verre"] :is(.rows li, .card, .pill:not(.accent), .iconbtn, .skin, .pad button, .datebox, .mic:not(.on), .btn.ghost):not(.picker *):not(.lab-body *)::after { content: none; }
+:root.gl-glass[data-skin="verre"] .rows:not(.picker *):not(.lab-body *) { border-radius: var(--group-r); }   /* la plaque d'un rayon : coins arrondis, pas un galet */
+:root.gl-glass[data-skin="verre"] :is(.rows, .card, .pill:not(.accent), .iconbtn, .skin, .pad button, .datebox, .mic:not(.on), .btn.ghost):not(.picker *):not(.lab-body *)::after { content: none; }
 :root.gl-glass[data-skin="verre"] .pad button:active { background: rgba(255,255,255,.18); }
 @keyframes drift { to { transform: translate3d(8vw, 6vh, 0) scale(1.12) rotate(18deg); } }
 
 /* La plaque de verre */
-[data-skin="verre"] :is(.rows li, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta) { position: relative; }
-[data-skin="verre"] :is(.rows li, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .tabs, .toast) {
+[data-skin="verre"] :is(.rows, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta) { position: relative; }
+[data-skin="verre"] :is(.rows, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .tabs, .toast) {
   background: var(--glass-shine), var(--glass-fill); border: 0; box-shadow: var(--glass-light);
   -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost);
 }
 /* Les reflets du bombé : une tache allongée en haut, une lueur en bas (lumière qui traverse le verre) */
-[data-skin="verre"] :is(.rows li, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta, .tabs, .toast)::after {
+[data-skin="verre"] :is(.rows, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta, .tabs, .toast)::after {
   content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
   background: var(--glass-gloss); mix-blend-mode: screen;
 }
@@ -430,16 +431,18 @@ body.lab-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
 [data-skin="verre"] body::before { background: rgba(10,15,44,.5); }
 [data-skin="verre"] .count b { background: rgba(255,255,255,.16); color: #fff; box-shadow: inset 1px 1px 0 rgba(255,255,255,.6), inset -1px -1px 0 rgba(255,255,255,.2); }
 
-/* Listes : des plaques séparées */
-[data-skin="verre"] .rows { background: none; border: 0; overflow: visible; display: grid; gap: 10px; }
-[data-skin="verre"] .rows li { border-radius: 20px; border-top: 0; }
+/* Listes : une seule plaque par rayon, comme dans Carnet, avec un fin trait entre les lignes */
+[data-skin="verre"] .rows { --group-r: 28px; border: 0; border-radius: var(--group-r); overflow: hidden; display: block; }
+[data-skin="verre"] .rows li { border-radius: 0; border-top: 1px solid rgba(255,255,255,.16); padding-inline: 8px; }   /* le contenu reste en retrait du bord, qui est la zone la plus claire du verre */
+[data-skin="verre"] .rows li:first-child { border-top: 0; }
 [data-skin="verre"] .tap { padding-block: 12px; }
+[data-skin="verre"] .rows :is(.name, .note, .when) { text-shadow: 0 1px 2px rgba(4,6,30,.7), 0 0 8px rgba(4,6,30,.5); }   /* texte lisible sur les zones claires du fond */
 [data-skin="verre"] .side { border-left: 1px solid rgba(255,255,255,.14); }
 [data-skin="verre"] .box { border-radius: 50%; border: 1.5px solid rgba(255,255,255,.75); background: rgba(255,255,255,.06); box-shadow: inset 1px 1px 0 rgba(255,255,255,.5); }
 [data-skin="verre"] .qty { background: rgba(255,255,255,.14); color: #fff; box-shadow: inset 1px 1px 0 rgba(255,255,255,.45); }
 [data-skin="verre"] .block.here .block-h h2::after { background: rgba(255,255,255,.18); color: #fff; box-shadow: inset 1px 1px 0 rgba(255,255,255,.55); }
-[data-skin="verre"] .block.bad .rows li { box-shadow: var(--glass-light), inset 0 0 0 1px rgba(255,154,168,.5), 0 0 26px rgba(255,120,140,.25); }
-[data-skin="verre"] .block.warn .rows li { box-shadow: var(--glass-light), inset 0 0 0 1px rgba(255,213,138,.45), 0 0 24px rgba(255,200,110,.2); }
+[data-skin="verre"] .block.bad .rows { box-shadow: var(--glass-light), inset 0 0 0 1px rgba(255,154,168,.5), 0 0 26px rgba(255,120,140,.25); }
+[data-skin="verre"] .block.warn .rows { box-shadow: var(--glass-light), inset 0 0 0 1px rgba(255,213,138,.45), 0 0 24px rgba(255,200,110,.2); }
 [data-skin="verre"] .tag-bad { background: rgba(255,154,168,.28); color: #fff; box-shadow: inset 1px 1px 0 rgba(255,255,255,.4); }
 [data-skin="verre"] .dot { background: #fff; box-shadow: 0 0 10px rgba(255,255,255,.8); }
 
@@ -486,8 +489,8 @@ body.lab-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
 
 /* Le volume : appliqué à tout élément qui porte une couleur --c.
    La couleur par défaut est posée sans aucune priorité (:where), pour que chaque élément puisse la changer. */
-:where([data-skin="argile"]) :where(.rows li, .card, .pill, .iconbtn, .skin, .pad button, .mic, .btn, .bigcta, .tabs, .toast, .badge, .count b, .side) { --c: #fffaff; }
-[data-skin="argile"] :is(.rows li, .card, .pill, .iconbtn, .skin, .pad button, .mic, .btn, .bigcta, .tabs, .toast, .badge, .count b, .side) {
+:where([data-skin="argile"]) :where(.rows, .card, .pill, .iconbtn, .skin, .pad button, .mic, .btn, .bigcta, .tabs, .toast, .badge, .count b, .side) { --c: #fffaff; }
+[data-skin="argile"] :is(.rows, .card, .pill, .iconbtn, .skin, .pad button, .mic, .btn, .bigcta, .tabs, .toast, .badge, .count b, .side) {
   background: var(--c); border: 0;
   box-shadow:
     0 14px 24px -8px color-mix(in srgb, var(--c) 45%, #4b2f9a 55%),
@@ -513,13 +516,14 @@ body.lab-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
 [data-skin="argile"] .block:not([data-aisle]):not(.bad):not(.warn) { --tint: #ece4ff; }
 [data-skin="argile"] #rangeList { --tint: #fff4c2; }
 [data-skin="argile"] .block.quiet { --tint: #eee8f7; }
-[data-skin="argile"] .rows li { --c: var(--tint, #fffaff); }
+[data-skin="argile"] .rows { --c: var(--tint, #fffaff); }
 
-/* Listes : des galets séparés */
+/* Listes : un seul galet par rayon, comme dans Carnet, avec une rainure entre les lignes */
 [data-skin="argile"] header { background: rgba(241,234,255,.82); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-bottom: 0; }
 [data-skin="argile"] h1 { font-weight: 700; }
-[data-skin="argile"] .rows { background: none; border: 0; overflow: visible; display: grid; gap: 12px; }
-[data-skin="argile"] .rows li { border-radius: 24px; border-top: 0; align-items: center; padding-right: 8px; }
+[data-skin="argile"] .rows { border: 0; border-radius: 28px; overflow: hidden; display: block; }
+[data-skin="argile"] .rows li { border-radius: 0; border-top: 2px solid rgba(75,47,154,.10); align-items: center; padding-right: 8px; }
+[data-skin="argile"] .rows li:first-child { border-top: 0; }
 [data-skin="argile"] .block-h h2 {
   font-size: 1.05rem; padding: 4px 14px; border-radius: 99px; background: var(--tint, #fffaff);
   box-shadow: 0 6px 12px -6px color-mix(in srgb, var(--tint, #fffaff) 40%, #4b2f9a 60%), inset 2px 3px 5px rgba(255,255,255,.8), inset -2px -3px 6px color-mix(in srgb, var(--tint, #fffaff) 75%, #4b2f9a 25%);
