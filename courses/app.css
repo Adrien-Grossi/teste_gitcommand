@@ -382,6 +382,7 @@ body.lab-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
    (choix du style, réglages de l'atelier) gardent le verre en CSS. */
 :root.gl-glass[data-skin="verre"] :is(.rows li, .card, .pill:not(.accent), .iconbtn, .skin, .pad button, .datebox, .mic:not(.on), .btn.ghost):not(.picker *):not(.lab-body *) {
   background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+  border-radius: 999px;   /* forme de galet, la même que le verre dessiné dessous */
 }
 :root.gl-glass[data-skin="verre"] :is(.rows li, .card, .pill:not(.accent), .iconbtn, .skin, .pad button, .datebox, .mic:not(.on), .btn.ghost):not(.picker *):not(.lab-body *)::after { content: none; }
 :root.gl-glass[data-skin="verre"] .pad button:active { background: rgba(255,255,255,.18); }

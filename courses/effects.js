@@ -344,12 +344,13 @@
    * (LiquidGlass de ybouane, liquidGL, article kube.io) :
    *  - la forme du verre est un champ de hauteur : bord en demi-cercle h = √(d·(2R − d)),
    *    d = distance au bord, R = largeur du bombé ; la normale de la surface vient de sa pente ;
-   *  - réfraction (indice 1,5) : l'image du fond est déviée selon cette pente — forte sur la courbe
-   *    du bord, nulle sur le plat — plus un léger grossissement (loupe) ;
-   *  - dispersion : rouge décalé vers l'extérieur, bleu vers l'intérieur, le long de la normale :
-   *    nulle au centre, de plus en plus forte vers les bords ;
-   *  - reflets : éclairage Blinn-Phong (lumière en haut à gauche) et Fresnel (le verre vu en biais
-   *    reflète plus) ; la couleur réfléchie est celle de l'environnement, c'est-à-dire le fond éclairci.
+   *  - réfraction rayon par rayon : le rayon venu de l'œil entre dans le verre selon la loi de Snell
+   *    (indice 1,5), traverse l'épaisseur du verre et touche le fond plus loin : presque rien au
+   *    centre (plat), forte déviation sur la courbe du bord (épais et penché) ; plus la loupe ;
+   *  - dispersion : chaque couleur a son propre indice, donc le rouge, le vert et le bleu se
+   *    séparent là où le verre dévie la lumière ;
+   *  - aucune lumière venue de l'avant : toute la lumière vient du fond. Seul ajout, la lumière du
+   *    fond qui voyage dans le verre et ressort tout au bord, en un liseré fin de sa couleur.
    * Les éléments en verre de la page deviennent transparents (classe .gl-glass) : leur texte reste
    * net par-dessus. Si WebGL manque, les disques et le verre en CSS de app.css restent en place.   */
   const GL_GLASS = ".rows li, .card, .pill:not(.accent), .iconbtn, .skin, .pad button, .datebox, .mic:not(.on), .btn.ghost";
@@ -387,10 +388,6 @@
       // Distance signée à un rectangle arrondi, et hauteur du bord en demi-cercle.
       "float rr(vec2 p, vec2 b, float r){ vec2 q = abs(p) - b + r; return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r; }",
       "float bevel(float d, float z){ d = clamp(d, 0.0, z); return sqrt(d * (2.0*z - d)); }",
-      // Distance au bord adoucie (minimum lissé des distances aux 4 côtés) : contrairement à la distance
-      // exacte, elle n'a pas de pli sur les diagonales, donc le relief reste un dôme continu, sans arête.
-      "float soft(vec2 lp, vec2 hs, float k){",
-      "  return -k * log(exp(-(hs.x + lp.x)/k) + exp(-(hs.x - lp.x)/k) + exp(-(hs.y + lp.y)/k) + exp(-(hs.y - lp.y)/k)); }",
       "void main(){",
       "  vec2 pc = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y) / px;",
       "  vec3 base = bgAt(pc);",
@@ -398,40 +395,42 @@
       "  vec4 b = vec4(0.0); float rad = 0.0; bool hit = false;",
       "  for (int j = 0; j < " + MAX_CARDS + "; j++){",
       "    if (float(j) >= ncard) break;",
-      "    vec2 hs = cards[j].zw * 0.5; float rj = min(crad[j], min(hs.x, hs.y));",
+      "    vec2 hs = cards[j].zw * 0.5; float rj = min(hs.x, hs.y);",   // forme de galet
       "    if (rr(pc - cards[j].xy - hs, hs, rj) < 1.0){ b = cards[j]; rad = rj; hit = true; }",
       "  }",
       "  if (!hit){ gl_FragColor = vec4(base, 1.0); return; }",
       "  vec2 hs = b.zw * 0.5, lp = pc - b.xy - hs;",
-      "  float sd = rr(lp, hs, rad);",
+      "  float sd = rr(lp, hs, rad), inside = -sd;",
       "  float zR = clamp(min(hs.x, hs.y) * 0.9 * gBezel, 1.5, min(hs.x, hs.y) * 0.98);",   // largeur du bombé
-      // pente du verre (différences finies sur le champ de hauteur) → normale
-      "  float e = 1.0, k = max(2.0, zR * 0.35);",
-      "  float hL = bevel(soft(lp - vec2(e, 0.0), hs, k), zR), hR = bevel(soft(lp + vec2(e, 0.0), hs, k), zR);",
-      "  float hU = bevel(soft(lp - vec2(0.0, e), hs, k), zR), hD = bevel(soft(lp + vec2(0.0, e), hs, k), zR);",
+      // Pente de la surface (différences finies sur le champ de hauteur) → normale.
+      // Galet : arrondi = demi-hauteur, donc la distance exacte n'a pas de pli dans le bombé.
+      "  float e = 1.0;",
+      "  float hL = bevel(-rr(lp - vec2(e, 0.0), hs, rad), zR), hR = bevel(-rr(lp + vec2(e, 0.0), hs, rad), zR);",
+      "  float hU = bevel(-rr(lp - vec2(0.0, e), hs, rad), zR), hD = bevel(-rr(lp + vec2(0.0, e), hs, rad), zR);",
       "  vec2 g = vec2(hR - hL, hD - hU) / (2.0 * e);",
       "  vec3 N = normalize(vec3(-g, 1.0));",
-      "  float edge = smoothstep(zR, 0.0, -sd);",
-      // réfraction : déviation vers l'intérieur selon la pente (indice 1,5), plus la loupe
-      "  vec2 refr = g / (1.0 + length(g)) * zR * (1.0 - 1.0/1.5) * 2.4 - lp * (1.0 - 1.0/gZoom);",
-      "  vec2 sp = pc + refr;",
-      // dispersion le long de la normale : nulle au centre, forte sur la courbe du bord
-      "  vec2 ca = N.xy * gDisp * 16.0 * (edge * 0.7 + 0.3);",
-      "  vec3 col = vec3(bgAt(sp + ca).r, bgAt(sp).g, bgAt(sp - ca).b);",
+      // Réfraction rayon par rayon : le rayon venu de l'œil entre dans le verre (loi de Snell),
+      // traverse son épaisseur, et touche le fond plus loin. Chaque couleur a son indice : dispersion.
+      "  float thick = bevel(inside, zR) + zR * 0.2;",
+      "  vec3 I = vec3(0.0, 0.0, -1.0);",
+      "  vec3 Tr = refract(I, N, 1.0 / (1.5 - 0.07 * gDisp));",
+      "  vec3 Tg = refract(I, N, 1.0 / 1.5);",
+      "  vec3 Tb = refract(I, N, 1.0 / (1.5 + 0.07 * gDisp));",
+      "  vec2 zoom = -lp * (1.0 - 1.0/gZoom);",
+      "  vec2 oR = Tr.xy / max(-Tr.z, 0.25) * thick * 1.6 + zoom;",
+      "  vec2 oG = Tg.xy / max(-Tg.z, 0.25) * thick * 1.6 + zoom;",
+      "  vec2 oB = Tb.xy / max(-Tb.z, 0.25) * thick * 1.6 + zoom;",
+      "  vec3 col = vec3(bgAt(pc + oR).r, bgAt(pc + oG).g, bgAt(pc + oB).b);",
       // verre fumé : on mélange avec une moyenne autour (flou)
       "  if (gFrost > 0.01){",
-      "    float rb = 4.0 + gFrost * 12.0;",
+      "    vec2 sp = pc + oG; float rb = 4.0 + gFrost * 12.0;",
       "    vec3 bl = (bgAt(sp + vec2(rb, 0.0)) + bgAt(sp - vec2(rb, 0.0)) + bgAt(sp + vec2(0.0, rb)) + bgAt(sp - vec2(0.0, rb))) * 0.25;",
-      "    col = mix(col, bl + 0.06, gFrost);",
+      "    col = mix(col, bl + 0.05, gFrost);",
       "  }",
-      // reflets : l'environnement (le fond, éclairci) réfléchi par le verre
-      "  vec3 env = mix(base * 1.45, vec3(1.0), 0.22);",
-      "  float fres = pow(1.0 - N.z, 3.0);",
-      "  col = mix(col, env, clamp(fres * 0.7 * gLight, 0.0, 0.85));",
-      "  vec3 V = vec3(0.0, 0.0, 1.0);",
-      "  vec3 L1 = normalize(vec3(-0.45, -0.8, 1.0)), L2 = normalize(vec3(0.5, 0.8, 1.0));",
-      "  float spec = pow(max(dot(N, normalize(L1 + V)), 0.0), 80.0) + pow(max(dot(N, normalize(L2 + V)), 0.0), 50.0) * 0.3;",
-      "  col += env * spec * 0.9 * gLight;",
+      // Le verre absorbe un peu là où il est épais ; la lumière du fond qui voyage dans le verre
+      // ressort tout au bord, en un liseré très fin de sa propre couleur.
+      "  col *= 1.0 - 0.05 * bevel(inside, zR) / zR;",
+      "  col += col * exp(-inside / 1.4) * 0.45 * gLight;",
       "  gl_FragColor = vec4(mix(base, col, 1.0 - smoothstep(-0.8, 0.6, sd)), 1.0);",   // bord lissé
       "}"
     ].join("\n"),
