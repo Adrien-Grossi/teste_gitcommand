@@ -16,7 +16,7 @@ Trois onglets, un par moment :
 | `index.html` | Structure de la page (aucune logique) |
 | `app.css` | Styles : Carnet (clair/sombre), Verre, Argile |
 | `app.js` | Logique : catalogue, données, affichage, dates, voix, rappels, transfert, atelier du verre |
-| `effects.js` | Effets facultatifs (`window.CoursesFX`) : animations, réfraction du Verre, fond 3D d'Argile ; l'appli marche sans eux |
+| `effects.js` | Effets facultatifs (`window.CoursesFX`) : animations, fond et verre du style Verre (WebGL), fond 3D d'Argile ; l'appli marche sans eux |
 | `sw.js` | Hors ligne et notifications de péremption |
 | `vendor/` | GSAP, canvas-confetti, Three.js r128 pour le fond 3D d'Argile (voir `vendor/README.md`) |
 | `manifest.webmanifest`, `icon-*.png` | Installation sur l'écran d'accueil |

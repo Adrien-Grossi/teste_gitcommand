@@ -376,9 +376,15 @@ body.lab-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
   --glass-shine: none;
   --glass-light: inset 0 -2px 4px rgba(0,0,30,.22), 0 14px 30px rgba(2,4,24,.3);
 }
-/* Quand le fond fluide tourne, c'est lui qui dessine l'ombre de contact et la lumière concentrée
-   sous chaque carte : plus d'ombre portée sombre, qui donnait l'impression de cartes collées. */
-:root.liquid.fx-fluid[data-skin="verre"] { --glass-light: inset 0 -2px 4px rgba(0,0,30,.18); }
+/* Verre dessiné en WebGL (effects.js, classe .gl-glass) : le verre de ces éléments est calculé
+   dans le fond, sous eux (réfraction, dispersion, reflets) ; ils deviennent donc transparents
+   et seul leur contenu reste. Même liste que GL_GLASS dans effects.js. Les panneaux opaques
+   (choix du style, réglages de l'atelier) gardent le verre en CSS. */
+:root.gl-glass[data-skin="verre"] :is(.rows li, .card, .pill:not(.accent), .iconbtn, .skin, .pad button, .datebox, .mic:not(.on), .btn.ghost):not(.picker *):not(.lab-body *) {
+  background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+:root.gl-glass[data-skin="verre"] :is(.rows li, .card, .pill:not(.accent), .iconbtn, .skin, .pad button, .datebox, .mic:not(.on), .btn.ghost):not(.picker *):not(.lab-body *)::after { content: none; }
+:root.gl-glass[data-skin="verre"] .pad button:active { background: rgba(255,255,255,.18); }
 @keyframes drift { to { transform: translate3d(8vw, 6vh, 0) scale(1.12) rotate(18deg); } }
 
 /* La plaque de verre */

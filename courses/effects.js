@@ -288,7 +288,10 @@
     apply() {
       this.frame = 0;
       if (!this.on) return;
-      document.querySelectorAll(LIQUID).forEach((el) => {
+      // Quand le verre des cartes est dessiné en WebGL, le filtre SVG ne sert plus qu'aux barres
+      // (en-tête, onglets, message), qui réfractent la liste qui défile sous elles.
+      const targets = document.documentElement.classList.contains("gl-glass") ? "header, .tabs, .toast" : LIQUID;
+      document.querySelectorAll(targets).forEach((el) => {
         const box = el.getBoundingClientRect();
         if (!box.width || !box.height) return;
         const w = Math.round(box.width), h = Math.round(box.height);
@@ -311,7 +314,7 @@
         this.version++;
         this.filters.clear();
         if (this.defs) this.defs.textContent = "";
-        document.querySelectorAll("[data-lg]").forEach((el) => delete el.dataset.lg);
+        document.querySelectorAll("[data-lg]").forEach((el) => { el.style.backdropFilter = el.style.webkitBackdropFilter = ""; delete el.dataset.lg; });
         this.schedule();
       }, 90);
     },
@@ -335,20 +338,30 @@
     }
   };
 
-  /* =====================  Fond fluide du Verre (acrylic pouring)  ========== *
-   * Des couches de couleur qui s'enroulent comme de la peinture versée, avec un fin liseré clair
-   * entre elles, et qui bougent très lentement. Courbes douces, sans flou ni arête.
-   * Calculé par la carte graphique (WebGL, sans bibliothèque), en résolution réduite et à 20 images/s
-   * pour ménager la batterie. Si WebGL manque, les disques de app.css restent en fond.          */
-  // Éléments qui projettent une caustique sur le fond (les barres et les petits boutons, non).
-  const CAUSTIC = ".rows li, .card, .bigcta, .datebox";
+  /* =====================  Fond fluide + verre des cartes (WebGL)  ========== *
+   * Le fond (peinture versée qui bouge lentement) et le verre des cartes sont calculés ensemble,
+   * pixel par pixel, par la carte graphique. Méthode reprise des rendus « Liquid Glass » de référence
+   * (LiquidGlass de ybouane, liquidGL, article kube.io) :
+   *  - la forme du verre est un champ de hauteur : bord en demi-cercle h = √(d·(2R − d)),
+   *    d = distance au bord, R = largeur du bombé ; la normale de la surface vient de sa pente ;
+   *  - réfraction (indice 1,5) : l'image du fond est déviée selon cette pente — forte sur la courbe
+   *    du bord, nulle sur le plat — plus un léger grossissement (loupe) ;
+   *  - dispersion : rouge décalé vers l'extérieur, bleu vers l'intérieur, le long de la normale :
+   *    nulle au centre, de plus en plus forte vers les bords ;
+   *  - reflets : éclairage Blinn-Phong (lumière en haut à gauche) et Fresnel (le verre vu en biais
+   *    reflète plus) ; la couleur réfléchie est celle de l'environnement, c'est-à-dire le fond éclairci.
+   * Les éléments en verre de la page deviennent transparents (classe .gl-glass) : leur texte reste
+   * net par-dessus. Si WebGL manque, les disques et le verre en CSS de app.css restent en place.   */
+  const GL_GLASS = ".rows li, .card, .pill:not(.accent), .iconbtn, .skin, .pad button, .datebox, .mic:not(.on), .btn.ghost";
+  const MAX_CARDS = 32;
   const fluid = {
-    canvas: null, gl: null, on: false, raf: 0, last: 0, time: 0,
+    canvas: null, gl: null, on: false, raf: 0, last: 0, time: 0, prevBoxes: "", radius: new WeakMap(),
     FRAG: [
       "precision highp float;",
-      "uniform vec2 res; uniform float t, scroll, oct, warp, size, fusion, lace, ncol;",
-      "uniform vec4 cards[24]; uniform float ncard, px;",   // cartes en verre à l'écran (pixels CSS) ; px = pixels du canvas par pixel CSS
+      "uniform vec2 res; uniform float t, scroll, oct, warp, size, fusion, lace, ncol, px;",
       "uniform vec3 cols[8];",
+      "uniform vec4 cards[" + MAX_CARDS + "]; uniform float crad[" + MAX_CARDS + "]; uniform float ncard;",
+      "uniform float gZoom, gBezel, gDisp, gFrost, gLight;",
       "float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }",
       "float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);",
       "  return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }",
@@ -357,35 +370,69 @@
       "vec3 pal(float i){ float k = mod(i, ncol); vec3 c = cols[0];",
       "  for (int j = 0; j < 8; j++) if (abs(float(j) - k) < 0.5) c = cols[j];",
       "  return c; }",
-      "void main(){",
-      "  vec2 p = (gl_FragCoord.xy - 0.5*res) / res.y * 0.9 / size + vec2(0.0, scroll * 0.25);",
+      // Couleur du fond en un point (pixels CSS, origine en haut à gauche).
+      "vec3 bgAt(vec2 css){",
+      "  vec2 fc = vec2(css.x * px, res.y - css.y * px);",
+      "  vec2 p = (fc - 0.5*res) / res.y * 0.9 / size + vec2(0.0, scroll * 0.25);",
       "  float s = t * 0.025;",
-      // déformation en cascade (domain warping) : ce sont les volutes de la peinture versée
       "  vec2 q = vec2(fbm(p + vec2(0.0, s)), fbm(p + vec2(5.2, 1.3) - s));",
       "  vec2 r = vec2(fbm(p + warp*q + vec2(1.7, 9.2) + s*1.4), fbm(p + warp*q + vec2(8.3, 2.8) - s));",
       "  float v = fbm(p + warp*1.07*r) * 2.6 + r.x;",
-      "  float k = v * 1.8 + p.x * 1.6 - p.y * 2.0;",                       // le long des vagues + une diagonale : plusieurs couleurs à l'écran
+      "  float k = v * 1.8 + p.x * 1.6 - p.y * 2.0;",
       "  float i = floor(k), fr = fract(k);",
-      "  vec3 c = mix(pal(i), pal(i + 1.0), smoothstep(0.5 - fusion*0.5, 0.5 + fusion*0.5, fr));",   // fusion : franc → fondu
-      "  c = mix(c, vec3(1.0, 0.96, 0.92), smoothstep(0.03, 0.0, abs(fr - 0.5)) * lace);",           // filet clair à chaque frontière
-      "  c *= 0.94 + 0.08 * fbm(p * 1.5 + r);",                               // légère matière
-      // Le verre posé sur le fond : sous chaque carte, une ombre de contact légère et serrée,
-      // et la lumière concentrée juste en dessous (caustique), de la couleur du fond.
-      "  vec2 pc = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y) / px;",   // ce pixel, en pixels CSS
-      "  float shade = 0.0, focus = 0.0;",
-      "  for (int j = 0; j < 24; j++){",
+      "  vec3 c = mix(pal(i), pal(i + 1.0), smoothstep(0.5 - fusion*0.5, 0.5 + fusion*0.5, fr));",
+      "  c = mix(c, vec3(1.0, 0.96, 0.92), smoothstep(0.03, 0.0, abs(fr - 0.5)) * lace);",
+      "  return c * (0.94 + 0.08 * fbm(p * 1.5 + r));",
+      "}",
+      // Distance signée à un rectangle arrondi, et hauteur du bord en demi-cercle.
+      "float rr(vec2 p, vec2 b, float r){ vec2 q = abs(p) - b + r; return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r; }",
+      "float bevel(float d, float z){ d = clamp(d, 0.0, z); return sqrt(d * (2.0*z - d)); }",
+      // Distance au bord adoucie (minimum lissé des distances aux 4 côtés) : contrairement à la distance
+      // exacte, elle n'a pas de pli sur les diagonales, donc le relief reste un dôme continu, sans arête.
+      "float soft(vec2 lp, vec2 hs, float k){",
+      "  return -k * log(exp(-(hs.x + lp.x)/k) + exp(-(hs.x - lp.x)/k) + exp(-(hs.y + lp.y)/k) + exp(-(hs.y - lp.y)/k)); }",
+      "void main(){",
+      "  vec2 pc = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y) / px;",
+      "  vec3 base = bgAt(pc);",
+      // la carte sous ce pixel, s'il y en a une
+      "  vec4 b = vec4(0.0); float rad = 0.0; bool hit = false;",
+      "  for (int j = 0; j < " + MAX_CARDS + "; j++){",
       "    if (float(j) >= ncard) break;",
-      "    vec4 b = cards[j]; vec2 hs = b.zw * 0.5, ctr = b.xy + hs;",
-      "    float rad = min(hs.y, 22.0);",
-      "    vec2 dd = abs(pc - ctr - vec2(0.0, 4.0)) - hs + rad;",
-      "    float sd = length(max(dd, 0.0)) + min(max(dd.x, dd.y), 0.0) - rad;",
-      "    float below = smoothstep(b.y + b.w * 0.3, b.y + b.w, pc.y);",          // l'ombre ne monte pas au-dessus de la carte
-      "    shade = max(shade, exp(-max(sd, 0.0) / 6.0) * 0.24 * below);",
-      "    vec2 e = (pc - vec2(ctr.x, b.y + b.w + b.w * 0.22)) / vec2(hs.x * 0.92, b.w * 0.42);",
-      "    focus += smoothstep(1.0, 0.0, length(e)) * 0.55;",
+      "    vec2 hs = cards[j].zw * 0.5; float rj = min(crad[j], min(hs.x, hs.y));",
+      "    if (rr(pc - cards[j].xy - hs, hs, rj) < 1.0){ b = cards[j]; rad = rj; hit = true; }",
       "  }",
-      "  c = c * (1.0 - shade) + c * focus * 1.1 + focus * 0.06;",
-      "  gl_FragColor = vec4(c, 1.0);",
+      "  if (!hit){ gl_FragColor = vec4(base, 1.0); return; }",
+      "  vec2 hs = b.zw * 0.5, lp = pc - b.xy - hs;",
+      "  float sd = rr(lp, hs, rad);",
+      "  float zR = clamp(min(hs.x, hs.y) * 0.9 * gBezel, 1.5, min(hs.x, hs.y) * 0.98);",   // largeur du bombé
+      // pente du verre (différences finies sur le champ de hauteur) → normale
+      "  float e = 1.0, k = max(2.0, zR * 0.35);",
+      "  float hL = bevel(soft(lp - vec2(e, 0.0), hs, k), zR), hR = bevel(soft(lp + vec2(e, 0.0), hs, k), zR);",
+      "  float hU = bevel(soft(lp - vec2(0.0, e), hs, k), zR), hD = bevel(soft(lp + vec2(0.0, e), hs, k), zR);",
+      "  vec2 g = vec2(hR - hL, hD - hU) / (2.0 * e);",
+      "  vec3 N = normalize(vec3(-g, 1.0));",
+      "  float edge = smoothstep(zR, 0.0, -sd);",
+      // réfraction : déviation vers l'intérieur selon la pente (indice 1,5), plus la loupe
+      "  vec2 refr = g / (1.0 + length(g)) * zR * (1.0 - 1.0/1.5) * 2.4 - lp * (1.0 - 1.0/gZoom);",
+      "  vec2 sp = pc + refr;",
+      // dispersion le long de la normale : nulle au centre, forte sur la courbe du bord
+      "  vec2 ca = N.xy * gDisp * 16.0 * (edge * 0.7 + 0.3);",
+      "  vec3 col = vec3(bgAt(sp + ca).r, bgAt(sp).g, bgAt(sp - ca).b);",
+      // verre fumé : on mélange avec une moyenne autour (flou)
+      "  if (gFrost > 0.01){",
+      "    float rb = 4.0 + gFrost * 12.0;",
+      "    vec3 bl = (bgAt(sp + vec2(rb, 0.0)) + bgAt(sp - vec2(rb, 0.0)) + bgAt(sp + vec2(0.0, rb)) + bgAt(sp - vec2(0.0, rb))) * 0.25;",
+      "    col = mix(col, bl + 0.06, gFrost);",
+      "  }",
+      // reflets : l'environnement (le fond, éclairci) réfléchi par le verre
+      "  vec3 env = mix(base * 1.45, vec3(1.0), 0.22);",
+      "  float fres = pow(1.0 - N.z, 3.0);",
+      "  col = mix(col, env, clamp(fres * 0.7 * gLight, 0.0, 0.85));",
+      "  vec3 V = vec3(0.0, 0.0, 1.0);",
+      "  vec3 L1 = normalize(vec3(-0.45, -0.8, 1.0)), L2 = normalize(vec3(0.5, 0.8, 1.0));",
+      "  float spec = pow(max(dot(N, normalize(L1 + V)), 0.0), 80.0) + pow(max(dot(N, normalize(L2 + V)), 0.0), 50.0) * 0.3;",
+      "  col += env * spec * 0.9 * gLight;",
+      "  gl_FragColor = vec4(mix(base, col, 1.0 - smoothstep(-0.8, 0.6, sd)), 1.0);",   // bord lissé
       "}"
     ].join("\n"),
     // Le contexte graphique est créé une seule fois ; ensuite on met simplement en pause ou on reprend.
@@ -397,13 +444,14 @@
       document.addEventListener("visibilitychange", this.onVisible);
       this.onResize();
       this.canvas.hidden = false;
-      document.documentElement.classList.add("fx-fluid");
+      document.documentElement.classList.add("fx-fluid", "gl-glass");
+      liquid.rebuild();
       this.last = performance.now();
       this.raf = requestAnimationFrame((now) => this.draw(now));
     },
     init() {
       const canvas = document.getElementById("fluid");
-      const gl = canvas && canvas.getContext("webgl", { antialias: false, alpha: false, powerPreference: "low-power" });
+      const gl = canvas && canvas.getContext("webgl", { antialias: false, alpha: false, powerPreference: "high-performance" });
       if (!gl) return false;
       const shader = (type, src) => { const sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh); return sh; };
       const prog = gl.createProgram();
@@ -417,28 +465,50 @@
       const loc = gl.getAttribLocation(prog, "a");
       gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       this.u = {};
-      for (const name of ["res", "t", "scroll", "oct", "warp", "size", "fusion", "lace", "ncol", "cols", "cards", "ncard", "px"]) this.u[name] = gl.getUniformLocation(prog, name);
+      for (const name of ["res", "t", "scroll", "oct", "warp", "size", "fusion", "lace", "ncol", "px", "cols", "cards", "crad", "ncard",
+        "gZoom", "gBezel", "gDisp", "gFrost", "gLight"]) this.u[name] = gl.getUniformLocation(prog, name);
       Object.assign(this, { canvas, gl });
       this.onResize = () => {
-        const k = 0.65;  // résolution réduite : les courbes restent douces, le téléphone respire
+        const k = 0.85;  // un peu sous la résolution de l'écran : les bords du verre restent nets, le téléphone respire
         canvas.width = Math.max(1, Math.round(innerWidth * k)); canvas.height = Math.max(1, Math.round(innerHeight * k));
         gl.viewport(0, 0, canvas.width, canvas.height);
+        this.prevBoxes = "";
       };
       this.onVisible = () => { if (document.hidden) cancelAnimationFrame(this.raf); else { this.last = performance.now(); this.raf = requestAnimationFrame((now) => this.draw(now)); } };
       return true;
     },
+    // Les éléments en verre visibles (position et arrondi), lus à chaque image.
+    boxes() {
+      const boxes = new Float32Array(MAX_CARDS * 4), radii = new Float32Array(MAX_CARDS);
+      let n = 0;
+      for (const el of document.querySelectorAll(GL_GLASS)) {
+        if (n === MAX_CARDS) break;
+        const b = el.getBoundingClientRect();
+        if (!b.width || !b.height || b.bottom < 0 || b.top > innerHeight) continue;
+        if (el.closest(".picker, .lab-body")) continue;   // panneaux opaques : leur verre reste en CSS
+        if (el.checkVisibility && !el.checkVisibility({ visibilityProperty: true })) continue;
+        let r = this.radius.get(el);
+        if (r === undefined) { r = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0; this.radius.set(el, r); }
+        boxes.set([b.left, b.top, b.width, b.height], n * 4); radii[n] = r; n++;
+      }
+      return { boxes, radii, n };
+    },
     draw(now) {
-      this.raf = requestAnimationFrame((n) => this.draw(n));
-      // 20 images par seconde suffisent pour un mouvement aussi lent ; pendant un défilement,
-      // on passe à toutes les images pour que la lumière sous les cartes les suive sans retard.
-      const moving = scrollY !== this.lastScroll; this.lastScroll = scrollY;
-      if (!moving && now - this.last < 50) return;
+      this.raf = requestAnimationFrame((t) => this.draw(t));
+      // 20 images/s suffisent pour le fond ; dès qu'un élément bouge (défilement, animation),
+      // on redessine à chaque image pour que le verre suive sans retard.
+      const { boxes, radii, n } = this.boxes();
+      const key = n + ":" + boxes.slice(0, n * 4).join(",");
+      const moved = key !== this.prevBoxes;
+      if (!moved && now - this.last < 50) return;
+      this.prevBoxes = key;
       this.time += ((now - this.last) / 1000) * glass.speed;   // la vitesse de l'atelier (0 = arrêt)
       this.last = now;
       const gl = this.gl, u = this.u, cols = glass.colors.slice(0, 8);
       const rgb = new Float32Array(24);
       cols.forEach((hex, i) => { const v = parseInt(hex.slice(1), 16); rgb.set([(v >> 16 & 255) / 255, (v >> 8 & 255) / 255, (v & 255) / 255], i * 3); });
       gl.uniform2f(u.res, this.canvas.width, this.canvas.height);
+      gl.uniform1f(u.px, this.canvas.width / innerWidth);
       gl.uniform1f(u.t, this.time);
       gl.uniform1f(u.scroll, scrollY / innerHeight);
       gl.uniform1f(u.oct, glass.complexity);
@@ -448,16 +518,9 @@
       gl.uniform1f(u.lace, glass.lace);
       gl.uniform1f(u.ncol, cols.length);
       gl.uniform3fv(u.cols, rgb);
-      // Les cartes en verre visibles, pour dessiner sous elles l'ombre de contact et la caustique.
-      const boxes = new Float32Array(96); let n = 0;
-      for (const el of document.querySelectorAll(CAUSTIC)) {
-        if (n === 24) break;
-        const b = el.getBoundingClientRect();
-        if (!b.width || b.bottom < -40 || b.top > innerHeight + 40) continue;
-        if (el.checkVisibility && !el.checkVisibility({ visibilityProperty: true })) continue;   // cartes masquées (labo, écran Ranger)
-        boxes.set([b.left, b.top, b.width, b.height], n++ * 4);
-      }
-      gl.uniform4fv(u.cards, boxes); gl.uniform1f(u.ncard, n); gl.uniform1f(u.px, this.canvas.width / innerWidth);
+      gl.uniform4fv(u.cards, boxes); gl.uniform1fv(u.crad, radii); gl.uniform1f(u.ncard, n);
+      gl.uniform1f(u.gZoom, glass.zoom); gl.uniform1f(u.gBezel, glass.bezel); gl.uniform1f(u.gDisp, glass.diffraction);
+      gl.uniform1f(u.gFrost, glass.frost); gl.uniform1f(u.gLight, glass.light);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     },
     stop() {
@@ -467,7 +530,8 @@
       removeEventListener("resize", this.onResize);
       document.removeEventListener("visibilitychange", this.onVisible);
       this.canvas.hidden = true;
-      document.documentElement.classList.remove("fx-fluid");
+      document.documentElement.classList.remove("fx-fluid", "gl-glass");
+      liquid.rebuild();
     }
   };
 
