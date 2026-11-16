@@ -416,7 +416,11 @@
       "  if (!hit){ gl_FragColor = vec4(base, 1.0); return; }",
       "  vec2 hs = b.zw * 0.5, lp = pc - b.xy - hs;",
       "  float sd = rr(lp, hs, rad), inside = -sd;",
-      "  float zR = clamp(min(hs.x, hs.y) * 0.9 * gBezel, 1.5, min(hs.x, hs.y) * 0.98);",   // largeur du bombé
+      // Largeur du bombé : 100 % = le bord courbe atteint exactement le centre de la carte, soit un dôme
+      // complet. Il n'y a alors aucune zone plate, donc la pente (et le décalage de l'image) traverse le
+      // centre sans à-coup. En dessous de 100 %, le sommet est plat, ce qui est voulu ; au-dessus, c'est
+      // le même dôme, et seule la rondeur du bord réfracté ne change plus.
+      "  float zR = clamp(min(hs.x, hs.y) * gBezel, 1.5, min(hs.x, hs.y));",
       // Pente de la surface (différences finies sur le champ de hauteur) → normale.
       // Galet : arrondi = demi-hauteur, donc la distance exacte n'a pas de pli dans le bombé.
       "  float e = 1.0;",
