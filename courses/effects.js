@@ -182,10 +182,14 @@
     filters: new Map(), defs: null, observer: null, frame: 0, on: false,
 
     // Carte de déformation : rouge = décalage horizontal, vert = décalage vertical (128 = aucun).
-    // Plus on est près du bord (dans la « tranche » du verre), plus l'image est tirée vers l'intérieur.
-    map(w, h, r, bezel) {
+    // Deux effets s'additionnent, comme dans une loupe en verre épais :
+    //  - la tranche (bezel) : près du bord, l'image est fortement tirée vers l'intérieur ;
+    //  - le grossissement (zoom > 1) : tout l'intérieur montre une zone plus petite, donc agrandie.
+    // range = décalage maximal en pixels, qui devient l'échelle du filtre.
+    map(w, h, r, bezel, zoom, range) {
       const c = document.createElement("canvas"); c.width = w; c.height = h;
       const g = c.getContext("2d"), img = g.createImageData(w, h), px = img.data;
+      const shrink = 1 - 1 / zoom;
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
           const ox = x + 0.5 - w / 2, oy = y + 0.5 - h / 2;
@@ -195,17 +199,21 @@
           let nx = 0, ny = 0;
           if (qx > 0 && qy > 0) { nx = qx / outside; ny = qy / outside; } else if (qx > qy) nx = 1; else ny = 1;
           nx *= Math.sign(ox) || 1; ny *= Math.sign(oy) || 1;
-          const k = depth < bezel ? Math.pow(1 - Math.max(depth, 0) / bezel, 2) : 0;
+          const edge = depth < bezel ? Math.pow(1 - Math.max(depth, 0) / bezel, 2) * bezel : 0;
+          const dx = -ox * shrink - nx * edge, dy = -oy * shrink - ny * edge;
           const i = (y * w + x) * 4;
-          px[i] = 128 - nx * k * 127; px[i + 1] = 128 - ny * k * 127; px[i + 2] = 128; px[i + 3] = 255;
+          px[i] = 128 + Math.max(-1, Math.min(1, dx / range)) * 127;
+          px[i + 1] = 128 + Math.max(-1, Math.min(1, dy / range)) * 127;
+          px[i + 2] = 128; px[i + 3] = 255;
         }
       }
       g.putImageData(img, 0, 0);
       return c.toDataURL();
     },
-    // Un filtre par taille : trois déformations (rouge, vert, bleu) recombinées.
-    filter(w, h, r) {
-      const id = "lg-" + w + "-" + h + "-" + r;
+    // Un filtre par taille : trois déformations (rouge, vert, bleu) de forces différentes,
+    // recombinées ; l'écart entre elles fait les franges irisées.
+    filter(w, h, r, lens) {
+      const id = "lg-" + w + "-" + h + "-" + r + (lens ? "-l" : "");
       if (this.filters.has(id)) return id;
       if (!this.defs) {
         const svg = document.createElementNS(SVG_NS, "svg");
@@ -215,16 +223,18 @@
         svg.appendChild(this.defs);
         document.body.appendChild(svg);
       }
-      const bezel = Math.max(8, Math.min(18, Math.min(w, h) * 0.3)), scale = bezel * 1.9;
+      const bezel = Math.max(8, Math.min(lens ? 26 : 16, Math.min(w, h) * 0.38));
+      const zoom = lens ? 1.12 : 1;
+      const range = bezel + (Math.max(w, h) / 2) * (1 - 1 / zoom);
+      const scale = range * 2;
       const channel = (n, s) => '<feDisplacementMap in="SourceGraphic" in2="map" scale="' + s.toFixed(1) + '" xChannelSelector="R" yChannelSelector="G" result="d' + n + '"/>' +
         '<feColorMatrix in="d' + n + '" type="matrix" values="' + ["1 0 0 0 0 0 0 0 0 0 0 0 0 0 0", "0 0 0 0 0 0 1 0 0 0 0 0 0 0 0", "0 0 0 0 0 0 0 0 0 0 0 0 1 0 0"][n] + ' 0 0 0 1 0" result="c' + n + '"/>';
       const f = document.createElementNS(SVG_NS, "filter");
       f.setAttribute("id", id);
       for (const [k, v] of Object.entries({ x: 0, y: 0, width: w, height: h, filterUnits: "userSpaceOnUse", "color-interpolation-filters": "sRGB" })) f.setAttribute(k, v);
-      f.innerHTML = '<feImage href="' + this.map(w, h, r, bezel) + '" x="0" y="0" width="' + w + '" height="' + h + '" preserveAspectRatio="none" result="map"/>' +
-        channel(0, scale) + channel(1, scale * 0.9) + channel(2, scale * 0.8) +
-        '<feBlend in="c0" in2="c1" mode="screen" result="rg"/><feBlend in="rg" in2="c2" mode="screen" result="rgb"/>' +
-        '<feGaussianBlur in="rgb" stdDeviation="0.5"/>';
+      f.innerHTML = '<feImage href="' + this.map(w, h, r, bezel, zoom, range) + '" x="0" y="0" width="' + w + '" height="' + h + '" preserveAspectRatio="none" result="map"/>' +
+        channel(0, scale) + channel(1, scale * 0.86) + channel(2, scale * 0.72) +
+        '<feBlend in="c0" in2="c1" mode="screen" result="rg"/><feBlend in="rg" in2="c2" mode="screen"/>';
       this.defs.appendChild(f);
       this.filters.set(id, f);
       return id;
@@ -237,12 +247,13 @@
         if (!box.width || !box.height) return;
         const w = Math.round(box.width), h = Math.round(box.height);
         const r = Math.round(Math.min(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0, w / 2, h / 2));
-        const id = this.filter(w, h, r);
+        // Les barres (en-tête, onglets) : bord seulement, sans loupe, et un peu de flou
+        // pour que le texte qui passe dessous ne gêne pas la lecture. Le reste : loupe nette.
+        const bar = el.matches("header, .tabs, .toast");
+        const id = this.filter(w, h, r, !bar);
         if (el.dataset.lg === id) return;
         el.dataset.lg = id;
-        // Les barres (en-tête, onglets) floutent un peu en plus : le texte qui passe dessous ne gêne pas la lecture.
-        const bar = el.matches("header, .tabs, .toast");
-        el.style.backdropFilter = el.style.webkitBackdropFilter = "url(#" + id + ")" + (bar ? " blur(5px)" : "") + " saturate(1.5) brightness(1.05)";
+        el.style.backdropFilter = el.style.webkitBackdropFilter = "url(#" + id + ")" + (bar ? " blur(5px)" : "") + " saturate(1.35)";
       });
     },
     schedule() { if (!this.frame) this.frame = requestAnimationFrame(() => this.apply()); },

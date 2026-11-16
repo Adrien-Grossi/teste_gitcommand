@@ -303,25 +303,24 @@ body.sheet-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
   --bg: #0a0f2c; --card: rgba(255,255,255,.06); --ink: #ffffff; --muted: rgba(255,255,255,.78);
   --line: rgba(255,255,255,.18); --hl: #8ff5e8; --hl-ink: #08122e; --ok: #8ff5c0; --bad: #ff9aa8; --warn: #ffd58a;
   --radius: 22px; --font-display: "Outfit", "Atkinson Hyperlegible", system-ui, sans-serif;
-  --glass-fill: linear-gradient(150deg, rgba(255,255,255,.12), rgba(255,255,255,.02) 45%, rgba(255,255,255,.06)),
-                linear-gradient(rgba(8,12,40,.16), rgba(8,12,40,.16));   /* légère teinte : texte lisible sur les zones claires */
-  --glass-shine: radial-gradient(140px circle at var(--mx, 15%) var(--my, -30%), rgba(255,255,255,.2), transparent 70%);
+  --glass-fill: linear-gradient(150deg, rgba(255,255,255,.07), rgba(255,255,255,0) 40%);   /* verre clair : juste un reflet en haut à gauche */
+  --glass-shine: radial-gradient(120px circle at var(--mx, 15%) var(--my, -30%), rgba(255,255,255,.16), transparent 70%);
   --glass-light: inset 1.5px 1.5px 0 rgba(255,255,255,.6), inset -1px -1px 0 rgba(255,255,255,.22),
-                 inset 0 0 20px rgba(255,255,255,.07), 0 12px 32px rgba(2,4,24,.32);
+                 inset 0 0 14px rgba(255,255,255,.05), 0 12px 32px rgba(2,4,24,.3);
   --glass-edge: linear-gradient(135deg, rgba(255,255,255,.85), rgba(255,255,255,.1) 30%, rgba(255,255,255,0) 55%, rgba(255,255,255,.35) 85%, rgba(255,255,255,.7));
   --frost: blur(10px) saturate(170%);
   color-scheme: dark;
 }
-[data-skin="verre"] body { background: var(--bg); text-shadow: 0 1px 2px rgba(4,6,30,.35); }
+[data-skin="verre"] body { background: var(--bg); text-shadow: 0 1px 2px rgba(4,6,30,.55), 0 0 10px rgba(4,6,30,.25); }   /* lisible sans voiler le verre */
 
 /* Le fond */
 .backdrop { display: none; }
 [data-skin="verre"] .backdrop { display: block; position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: #0a0f2c; }
-[data-skin="verre"] .backdrop i { position: absolute; border-radius: 50%; filter: blur(30px); will-change: transform; animation: drift 26s ease-in-out infinite alternate; }
-[data-skin="verre"] .backdrop i:nth-child(1) { width: 95vmax; height: 95vmax; left: -45vmax; top: -40vmax; background: radial-gradient(circle at 60% 60%, #3f7dff, #2b2fc9 45%, transparent 70%); }
-[data-skin="verre"] .backdrop i:nth-child(2) { width: 80vmax; height: 80vmax; right: -40vmax; top: 10vh; background: radial-gradient(circle at 40% 45%, #ff9a62, #ff4f84 45%, transparent 70%); animation-duration: 32s; animation-delay: -8s; }
-[data-skin="verre"] .backdrop i:nth-child(3) { width: 85vmax; height: 85vmax; left: -30vmax; bottom: -45vmax; background: radial-gradient(circle at 50% 40%, #a35bff, #5a2bd6 50%, transparent 70%); animation-duration: 38s; animation-delay: -15s; }
-[data-skin="verre"] .backdrop i:nth-child(4) { width: 50vmax; height: 50vmax; right: -15vmax; bottom: 5vh; background: radial-gradient(circle at 50% 50%, #2fe3cf, #1aa3c4 50%, transparent 70%); animation-duration: 29s; animation-delay: -4s; }
+[data-skin="verre"] .backdrop i { position: absolute; border-radius: 50%; filter: blur(8px); will-change: transform; animation: drift 26s ease-in-out infinite alternate; }
+[data-skin="verre"] .backdrop i:nth-child(1) { width: 95vmax; height: 95vmax; left: -45vmax; top: -40vmax; background: radial-gradient(circle at 60% 60%, #4f8bff, #2b2fc9 52%, transparent 60%); }
+[data-skin="verre"] .backdrop i:nth-child(2) { width: 80vmax; height: 80vmax; right: -40vmax; top: 10vh; background: radial-gradient(circle at 40% 45%, #ffa36b, #ff4f84 52%, transparent 60%); animation-duration: 32s; animation-delay: -8s; }
+[data-skin="verre"] .backdrop i:nth-child(3) { width: 85vmax; height: 85vmax; left: -30vmax; bottom: -45vmax; background: radial-gradient(circle at 50% 40%, #b06bff, #5a2bd6 54%, transparent 62%); animation-duration: 38s; animation-delay: -15s; }
+[data-skin="verre"] .backdrop i:nth-child(4) { width: 50vmax; height: 50vmax; right: -15vmax; bottom: 5vh; background: radial-gradient(circle at 50% 50%, #3ff0d9, #1aa3c4 54%, transparent 62%); animation-duration: 29s; animation-delay: -4s; }
 @keyframes drift { to { transform: translate3d(8vw, 6vh, 0) scale(1.12) rotate(18deg); } }
 
 /* La plaque de verre */
