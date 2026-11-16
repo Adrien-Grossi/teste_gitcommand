@@ -11,7 +11,7 @@
 <title>Mes courses</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Outfit:wght@500;700;800&family=Kalam:wght@700&family=VT323&family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&family=Sora:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
 /* Layout : une seule colonne façon carnet, en-tête collant avec le compteur, rayons dans l'ordre du magasin. */
 :root {
@@ -331,18 +331,265 @@ details.group[open] summary .aisle-h h2::after { content: "Masquer"; }
 }
 li.leaving { animation: out .38s ease forwards; }
 
+/* =====================  STYLES AU CHOIX  =====================
+   carnet (défaut) · verre (glassmorphisme) · relief (skeuomorphisme)
+   argile (claymorphisme) · tech (minimalisme high-tech clair)
+   Chaque style assume un seul rendu (clair ou sombre) et redéfinit ses couleurs. */
+
+/* Sélecteur de style */
+.top { align-items: center; }
+.topr { display: flex; align-items: center; gap: 10px; }
+.skinbtn {
+  width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
+  background: var(--card); color: var(--ink); border: 1.5px solid var(--line);
+}
+.skinbtn svg { width: 20px; height: 20px; }
+.skinsheet { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
+.skinsheet .scrim { position: absolute; inset: 0; background: rgba(0,0,0,.45); border: 0; cursor: pointer; }
+.skinpanel {
+  position: relative; width: min(560px, 100%); max-height: 88%; overflow-y: auto;
+  background: var(--bg); color: var(--ink); border-radius: 22px 22px 0 0;
+  padding: 18px max(16px, env(safe-area-inset-right, 0px)) calc(18px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  display: grid; gap: 12px; box-shadow: 0 -10px 40px rgba(0,0,0,.3);
+}
+.skinpanel h2 { font-family: var(--font-display); margin: 0; font-size: 1.3rem; }
+.skinlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.skinopt {
+  font: inherit; color: inherit; text-align: left; cursor: pointer; padding: 8px; border-radius: 16px;
+  background: var(--card); border: 2px solid var(--line); display: grid; gap: 8px;
+}
+.skinopt[aria-pressed="true"] { border-color: var(--ink); }
+.skinopt b { font-size: 1rem; }
+.skinopt small { color: var(--muted); font-size: .78rem; line-height: 1.25; }
+.sw { height: 74px; border-radius: 10px; position: relative; overflow: hidden; display: grid; place-items: center; }
+.sw i { width: 70%; height: 30px; border-radius: 8px; display: flex; align-items: center; gap: 6px; padding: 0 8px; }
+.sw i::before { content: ""; width: 12px; height: 12px; border-radius: 3px; }
+.sw i::after { content: ""; flex: 1; height: 5px; border-radius: 3px; opacity: .6; }
+.sw-carnet { background: #0e0e10; }
+.sw-carnet i { background: #18181c; border: 1px solid #2a2a30; }
+.sw-carnet i::before { background: #ffd92e; } .sw-carnet i::after { background: #f2f1ec; }
+.sw-verre { background: radial-gradient(60% 60% at 20% 20%, #ff5fa2, transparent), radial-gradient(60% 60% at 90% 80%, #2fe0c8, transparent), linear-gradient(160deg, #2a1660, #0d1b3d); }
+.sw-verre i { background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.4); backdrop-filter: blur(6px); }
+.sw-verre i::before { background: #7cf3e3; } .sw-verre i::after { background: #fff; }
+.sw-relief { background: repeating-linear-gradient(45deg, rgba(0,0,0,.04) 0 2px, transparent 2px 6px), #e6dcc6; }
+.sw-relief i { background: #fffdf6; border: 1px solid #cdbf9f; box-shadow: 0 3px 6px rgba(70,50,20,.3); }
+.sw-relief i::before { background: linear-gradient(#ffe27a, #e9b730); box-shadow: 0 1px 0 #a87d10; } .sw-relief i::after { background: #2b2418; }
+.sw-argile { background: radial-gradient(60% 60% at 10% 10%, #ffd6e8, transparent), #efe7ff; }
+.sw-argile i { background: #fbf8ff; border-radius: 14px; box-shadow: 5px 5px 10px rgba(124,98,190,.3), -4px -4px 8px #fff; }
+.sw-argile i::before { background: #ffb86b; border-radius: 6px; } .sw-argile i::after { background: #3a2e5c; }
+.sw-tech { background: radial-gradient(#d4d8de 1px, transparent 1px) 0 0 / 10px 10px, #f6f7f9; }
+.sw-tech i { background: #fff; border: 1px solid #e1e4e8; border-radius: 4px; }
+.sw-tech i::before { background: #2f6bff; border-radius: 2px; } .sw-tech i::after { background: #0b0d12; height: 3px; }
+
+[data-skin] .sheet { background: inherit; background-attachment: scroll; }
+
+/* ---------- VERRE · glassmorphisme ---------- */
+:root[data-skin="verre"] {
+  --bg: #1a1240; --card: rgba(255,255,255,.10); --ink: #ffffff; --muted: rgba(255,255,255,.7);
+  --line: rgba(255,255,255,.2); --hl: #7cf3e3; --hl-ink: #0b1430; --ok: #7cf3b0; --ok-soft: rgba(124,243,176,.14);
+  --skip: rgba(255,255,255,.5); --bad: #ff8fa0; --warn: #ffd27a; --radius: 22px;
+  --font-display: "Outfit", "Atkinson Hyperlegible", system-ui, sans-serif; color-scheme: dark;
+}
+[data-skin="verre"] body {
+  background:
+    radial-gradient(55% 35% at 10% 8%, rgba(255,95,162,.75), transparent 70%),
+    radial-gradient(50% 35% at 95% 35%, rgba(79,125,255,.75), transparent 70%),
+    radial-gradient(60% 40% at 40% 100%, rgba(47,224,200,.6), transparent 70%),
+    linear-gradient(165deg, #241458, #0d1b3d);
+  background-attachment: fixed;
+}
+[data-skin="verre"] :is(ul, .empty, .notifcard, .pill, .pad button, .datebox, .mic, .btn.ghost, .skinbtn, .skinopt) {
+  background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.24);
+  -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%);
+  box-shadow: 0 10px 30px rgba(5,0,40,.28), inset 0 1px 0 rgba(255,255,255,.3);
+}
+[data-skin="verre"] header, [data-skin="verre"] .tabs {
+  background: rgba(26,18,64,.4); -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%);
+}
+[data-skin="verre"] body::before { background: rgba(26,18,64,.6); }
+[data-skin="verre"] .tabs { border-top: 1px solid rgba(255,255,255,.18); }
+[data-skin="verre"] .bigcta { background: linear-gradient(120deg, #7cf3e3, #9d8bff 60%, #ff8fc8); color: #0b1430; box-shadow: 0 10px 30px rgba(124,243,227,.35); }
+[data-skin="verre"] .btn { background: rgba(255,255,255,.92); color: #160f3a; border-color: transparent; }
+[data-skin="verre"] .btn.ghost { color: #fff; }
+[data-skin="verre"] .btn.go { background: var(--ok); color: #0b1430; }
+[data-skin="verre"] .btn.go.ready { background: var(--hl); }
+[data-skin="verre"] .toast { background: rgba(255,255,255,.88); color: #160f3a; backdrop-filter: blur(16px); }
+[data-skin="verre"] .badge { background: #fff; color: #160f3a; }
+[data-skin="verre"] li.leaving { background: rgba(124,243,176,.15); }
+[data-skin="verre"] .skinpanel { background: rgba(26,18,64,.75); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
+[data-skin="verre"] .tag-exp { color: #2a0b14; }
+
+/* ---------- RELIEF · skeuomorphisme (papier, cuir, minuteur LCD) ---------- */
+:root[data-skin="relief"] {
+  --bg: #e6dcc6; --card: #fffdf6; --ink: #2b2418; --muted: #786b55; --line: #d8cbb0;
+  --hl: #f2c94c; --hl-ink: #2b2418; --ok: #3f8f3a; --ok-soft: #e6f0d8; --skip: #a89a80;
+  --bad: #b4372a; --warn: #9c5a12; --radius: 10px;
+  --font-display: "Kalam", "Atkinson Hyperlegible", cursive; color-scheme: light;
+}
+[data-skin="relief"] body {
+  background: repeating-linear-gradient(45deg, rgba(60,40,10,.035) 0 2px, transparent 2px 6px), linear-gradient(#ebe2cf, #ddd1b8);
+  background-attachment: fixed;
+}
+[data-skin="relief"] header { background: linear-gradient(#f6efdf, #e7dcc4); border-bottom: 1px solid #c6b693; box-shadow: 0 3px 8px rgba(70,50,20,.15); }
+[data-skin="relief"] h1 { text-shadow: 0 1px 0 #fff; }
+[data-skin="relief"] ul {
+  background: linear-gradient(90deg, transparent 50px, #e9a9a3 50px, #e9a9a3 52px, transparent 52px), #fffdf6;
+  border: 1px solid #d3c5a6; box-shadow: 0 1px 0 #fff inset, 0 4px 10px rgba(70,50,20,.18), 0 1px 2px rgba(70,50,20,.25);
+}
+[data-skin="relief"] li { border-top-color: #d6e1ec; }
+[data-skin="relief"] .tap { padding-left: 12px; gap: 18px; }
+[data-skin="relief"] .box { background: linear-gradient(#fff, #ece4d2); border: 1px solid #a99878; border-radius: 6px; box-shadow: inset 0 1px 2px rgba(0,0,0,.15), 0 1px 0 #fff; }
+[data-skin="relief"] :is(.pill, .btn.ghost, .pad button, .mic, .skinbtn, .skinopt, .empty, .notifcard) {
+  background: linear-gradient(#fffdf8, #e9e0cd); border: 1px solid #b8a888; color: var(--ink);
+  box-shadow: 0 2px 0 #a8987a, 0 4px 8px rgba(70,50,20,.18), inset 0 1px 0 #fff;
+}
+[data-skin="relief"] :is(.pill, .btn, .pad button, .mic, .bigcta, .side):active { transform: translateY(2px); box-shadow: 0 0 0 #a8987a, inset 0 2px 4px rgba(0,0,0,.15); }
+[data-skin="relief"] .btn:not(.ghost) { background: linear-gradient(#5d4834, #3a2c1e); color: #fdf3dc; border: 1px solid #2a1f13; box-shadow: 0 2px 0 #1f160d, 0 4px 8px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.18); }
+[data-skin="relief"] .btn.go { background: linear-gradient(#69b85d, #3a7f33); border-color: #2c6226; color: #fff; }
+[data-skin="relief"] .btn.go.ready { background: linear-gradient(#ffe27a, #e9b730); border-color: #b88a14; color: #3a2a05; }
+[data-skin="relief"] .bigcta {
+  background: linear-gradient(#ffe27a, #e6b12a); color: #3a2a05; border: 1px solid #b88a14;
+  box-shadow: 0 3px 0 #a87d10, 0 8px 14px rgba(70,50,20,.25), inset 0 1px 0 rgba(255,255,255,.7);
+}
+[data-skin="relief"] .datebox {
+  font-family: "VT323", ui-monospace, monospace; font-weight: 400; font-size: clamp(2.6rem, 13vw, 3.4rem); letter-spacing: .08em;
+  background: linear-gradient(#bcc99c, #a7b886); color: #1f2b16; border: 3px solid #5a4a33; border-radius: 8px;
+  box-shadow: inset 0 3px 8px rgba(0,0,0,.35), 0 1px 0 #fff;
+}
+[data-skin="relief"] .datebox .ph { color: rgba(31,43,22,.18); }
+[data-skin="relief"] .datebox .sep { color: #1f2b16; }
+[data-skin="relief"] .datebox.ok { border-color: #3a7f33; }
+[data-skin="relief"] .tabs { background: linear-gradient(#4d3b29, #2f2418); border-top: 1px solid #6b5640; box-shadow: 0 -3px 10px rgba(0,0,0,.25); }
+[data-skin="relief"] .tabs button { color: #cdbb97; }
+[data-skin="relief"] .tabs button[aria-current="page"] { color: #ffe9a8; text-shadow: 0 0 10px rgba(255,220,120,.5); }
+[data-skin="relief"] .tabs button[aria-current="page"]::before { background: #ffe27a; box-shadow: 0 0 8px #ffe27a; }
+[data-skin="relief"] .badge { background: linear-gradient(#d9483a, #9e2a1f); color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.3); }
+[data-skin="relief"] .badge.hl { background: linear-gradient(#ffe27a, #e6b12a); color: #3a2a05; }
+[data-skin="relief"] .qty { background: #fbe8a6; border: 1px dashed #c9a640; }
+[data-skin="relief"] .toast { background: #fff8d6; color: #2b2418; border: 1px solid #d8c47a; box-shadow: 0 6px 14px rgba(70,50,20,.3); transform: translateX(-50%) rotate(-.6deg); }
+[data-skin="relief"] .toast button { background: linear-gradient(#ffe27a, #e6b12a); }
+[data-skin="relief"] .side { color: var(--muted); }
+
+/* ---------- ARGILE · claymorphisme ---------- */
+:root[data-skin="argile"] {
+  --bg: #efe7ff; --card: #fbf8ff; --ink: #3a2e5c; --muted: #84799f; --line: #e8e0f7;
+  --hl: #ffb86b; --hl-ink: #3a2e5c; --ok: #2fb383; --ok-soft: #dcf6ec; --skip: #b3a9cb;
+  --bad: #e14f66; --warn: #b8690f; --radius: 28px;
+  --font-display: "Fredoka", "Nunito", system-ui, sans-serif; --font-body: "Nunito", "Atkinson Hyperlegible", system-ui, sans-serif;
+  color-scheme: light;
+}
+[data-skin="argile"] body {
+  background: radial-gradient(45% 30% at 0% 0%, #ffd6e8, transparent 70%), radial-gradient(45% 30% at 100% 25%, #d2efff, transparent 70%),
+    radial-gradient(50% 30% at 30% 100%, #ffe9c9, transparent 70%), #efe7ff;
+  background-attachment: fixed;
+}
+[data-skin="argile"] header { background: rgba(239,231,255,.82); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-bottom: 0; }
+[data-skin="argile"] h1 { font-weight: 700; }
+[data-skin="argile"] :is(ul, .empty, .notifcard, .pill, .pad button, .datebox, .mic, .btn.ghost, .skinbtn, .skinopt) {
+  background: var(--card); border: 0;
+  box-shadow: 8px 8px 18px rgba(124,98,190,.22), -6px -6px 14px rgba(255,255,255,.95),
+    inset 2px 2px 4px rgba(255,255,255,.9), inset -3px -3px 6px rgba(124,98,190,.10);
+}
+[data-skin="argile"] ul { margin-inline: 2px; }
+[data-skin="argile"] li { border-top: 2px solid #f1ebfc; }
+[data-skin="argile"] .box { border: 0; border-radius: 10px; background: #efe7ff; box-shadow: inset 3px 3px 6px rgba(124,98,190,.22), inset -3px -3px 6px #fff; }
+[data-skin="argile"] .pill, [data-skin="argile"] .btn, [data-skin="argile"] .pad button, [data-skin="argile"] .mic { border-radius: 20px; }
+[data-skin="argile"] .bigcta {
+  border-radius: 26px; background: linear-gradient(160deg, #ffcf9a, #ff9a6b); color: #3a1f12;
+  box-shadow: 0 12px 24px rgba(255,140,90,.35), inset 0 -6px 12px rgba(0,0,0,.08), inset 0 6px 12px rgba(255,255,255,.55);
+}
+[data-skin="argile"] .btn:not(.ghost) { background: linear-gradient(160deg, #9b86e0, #7c62be); color: #fff; border: 0; box-shadow: 0 10px 20px rgba(124,98,190,.35), inset 0 -5px 10px rgba(0,0,0,.1), inset 0 5px 10px rgba(255,255,255,.35); }
+[data-skin="argile"] .btn.go { background: linear-gradient(160deg, #6fe0b5, #2fb383); color: #08392a; }
+[data-skin="argile"] .btn.go.ready { background: linear-gradient(160deg, #ffcf9a, #ff9a6b); color: #3a1f12; }
+[data-skin="argile"] .qty { border-radius: 99px; background: #ffe2c2; padding: 1px 9px; }
+[data-skin="argile"] .badge { box-shadow: 0 4px 8px rgba(124,98,190,.35); }
+[data-skin="argile"] .badge.hl { background: #ffb86b; }
+[data-skin="argile"] .tabs {
+  left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); padding-bottom: 0; border: 0; border-radius: 28px;
+  background: var(--card); box-shadow: 0 14px 30px rgba(124,98,190,.3), inset 0 2px 4px #fff, inset 0 -4px 8px rgba(124,98,190,.12);
+}
+[data-skin="argile"] .tabs button[aria-current="page"] { color: #7c62be; }
+[data-skin="argile"] .tabs button[aria-current="page"]::before { top: auto; bottom: 8px; left: calc(50% - 4px); right: auto; width: 8px; height: 8px; border-radius: 50%; background: #7c62be; }
+[data-skin="argile"] .toast { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); border-radius: 22px; background: #3a2e5c; color: #fff; }
+[data-skin="argile"] .wrap { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
+[data-skin="argile"] .tag-exp { border-radius: 99px; color: #fff; }
+
+/* ---------- TECH · minimalisme high-tech, clair, premium ---------- */
+:root[data-skin="tech"] {
+  --bg: #f6f7f9; --card: #ffffff; --ink: #0b0d12; --muted: #6b7280; --line: #e4e7eb;
+  --hl: #2f6bff; --hl-ink: #ffffff; --ok: #00a775; --ok-soft: #e9f9f3; --skip: #a3a9b3;
+  --bad: #ef2b4f; --warn: #c26a00; --radius: 6px;
+  --font-display: "Sora", system-ui, sans-serif; --font-body: "Sora", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace; color-scheme: light;
+}
+[data-skin="tech"] body { background: radial-gradient(#d9dde3 1px, transparent 1.2px) 0 0 / 20px 20px, #f6f7f9; background-attachment: fixed; font-size: 17px; }
+[data-skin="tech"] header { background: rgba(246,247,249,.86); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+[data-skin="tech"] h1 { font-weight: 600; letter-spacing: -.03em; }
+[data-skin="tech"] .sub, [data-skin="tech"] .aisle-h h2 { font-family: var(--mono); }
+[data-skin="tech"] .sub { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; }
+[data-skin="tech"] .aisle-h h2 { font-size: .74rem; font-weight: 500; text-transform: uppercase; letter-spacing: .16em; color: var(--muted); }
+[data-skin="tech"] .aisle-h.g-bad h2 { color: var(--bad); } [data-skin="tech"] .aisle-h.g-warn h2 { color: var(--warn); }
+[data-skin="tech"] section.current .aisle-h h2::after { background: var(--hl); color: #fff; border-radius: 2px; font-family: var(--mono); }
+[data-skin="tech"] :is(.n, .left, .badge, .when, .qty, .count, .datebox, .pad button, .note) { font-family: var(--mono); }
+[data-skin="tech"] .left b { background: var(--ink); color: #fff; border-radius: 3px; }
+[data-skin="tech"] ul { box-shadow: 0 1px 2px rgba(11,13,18,.04); }
+[data-skin="tech"] .name { font-size: 1.02rem; }
+[data-skin="tech"] .box { border-radius: 3px; border: 1.5px solid var(--ink); width: 24px; height: 24px; }
+[data-skin="tech"] .qty { background: transparent; border: 1px solid var(--line); color: var(--ink); font-size: .74rem; border-radius: 3px; }
+[data-skin="tech"] .side { text-transform: uppercase; letter-spacing: .1em; font-size: .62rem; }
+[data-skin="tech"] .pill, [data-skin="tech"] .skinbtn { border: 1px solid var(--line); border-radius: 4px; }
+[data-skin="tech"] .skinbtn { border-radius: 6px; }
+[data-skin="tech"] .btn { border-radius: 4px; text-transform: uppercase; letter-spacing: .08em; font-size: .85rem; font-weight: 600; }
+[data-skin="tech"] .btn.ghost { border: 1px solid var(--line); }
+[data-skin="tech"] .btn.go { background: var(--hl); border-color: var(--hl); color: #fff; }
+[data-skin="tech"] .btn.go.ready { background: var(--ink); border-color: var(--ink); color: #fff; box-shadow: 0 0 0 3px rgba(47,107,255,.35); animation: none; }
+[data-skin="tech"] .bigcta {
+  background: var(--ink); color: #fff; border-radius: 6px; text-transform: uppercase; letter-spacing: .12em; font-size: .95rem; font-weight: 600;
+  box-shadow: inset 0 -3px 0 var(--hl), 0 8px 24px rgba(47,107,255,.18);
+}
+[data-skin="tech"] .datebox { border: 1px solid var(--line); border-radius: 6px; font-weight: 500; letter-spacing: .12em; }
+[data-skin="tech"] .datebox.ok { border-color: var(--hl); box-shadow: 0 0 0 3px rgba(47,107,255,.15); }
+[data-skin="tech"] .pad button { border-radius: 4px; font-weight: 500; }
+[data-skin="tech"] .mic { border: 1px solid var(--ink); border-radius: 4px; text-transform: uppercase; letter-spacing: .1em; font-size: .85rem; }
+[data-skin="tech"] .mic.on { background: var(--hl); border-color: var(--hl); color: #fff; }
+[data-skin="tech"] .tabs { background: rgba(255,255,255,.9); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+[data-skin="tech"] .tabs button { font-family: var(--mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .12em; font-weight: 500; }
+[data-skin="tech"] .tabs svg { stroke-width: 1.5; }
+[data-skin="tech"] .tabs button[aria-current="page"]::before { left: 0; right: 0; height: 2px; border-radius: 0; background: var(--hl); }
+[data-skin="tech"] .badge { border-radius: 3px; }
+[data-skin="tech"] .badge.hl { background: var(--hl); color: #fff; }
+[data-skin="tech"] .when b { font-family: var(--mono); font-weight: 500; }
+[data-skin="tech"] .tag-exp { background: transparent; color: var(--bad); border: 1px solid var(--bad); border-radius: 2px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .06em; font-size: .68rem; }
+[data-skin="tech"] .dot { border-radius: 1px; width: 8px; height: 8px; background: var(--hl); }
+[data-skin="tech"] .toast { border-radius: 6px; }
+[data-skin="tech"] .toast button { background: var(--hl); color: #fff; border-radius: 4px; }
+[data-skin="tech"] h1, [data-skin="tech"] .item-name { font-family: var(--font-display); }
+
+/* Le micro allumé garde sa couleur d'écoute dans tous les styles */
+[data-skin] .skinopt[aria-pressed="true"] { outline: 3px solid var(--ink); outline-offset: 2px; }
+[data-skin] .mic.on { background: var(--hl); color: var(--hl-ink); border-color: var(--hl); }
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
 </style>
 </head>
 <body>
+<script>
+try { var __s = JSON.parse(localStorage.getItem("courses-v1") || "{}").skin; document.documentElement.setAttribute("data-skin", __s || "carnet"); }
+catch (e) { document.documentElement.setAttribute("data-skin", "carnet"); }
+</script>
 
 <div class="wrap">
   <header>
     <div class="top">
       <h1 id="viewTitle">À acheter</h1>
-      <div class="left" id="left"></div>
+      <div class="topr">
+        <div class="left" id="left"></div>
+        <button class="skinbtn" id="skinBtn" type="button" aria-label="Changer le style de l'appli">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.7-.9 1.4-1.8-.4-1 .3-2.2 1.4-2.2H17a4 4 0 0 0 4-4c0-5.5-4-10-9-10z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg>
+        </button>
+      </div>
     </div>
     <p class="sub" id="viewSub"></p>
   </header>
@@ -417,6 +664,21 @@ li.leaving { animation: out .38s ease forwards; }
     <span>Chez moi</span><b class="badge" id="bFrigo" hidden></b>
   </button>
 </nav>
+
+<div class="skinsheet" id="skinSheet" hidden>
+  <button class="scrim" id="skinScrim" type="button" aria-label="Fermer"></button>
+  <div class="skinpanel" role="dialog" aria-modal="true" aria-labelledby="skinTitle">
+    <h2 id="skinTitle">Style de l'appli</h2>
+    <div class="skinlist" id="skinList">
+      <button class="skinopt" type="button" data-pick="carnet"><span class="sw sw-carnet"><i></i></span><b>Carnet</b><small>Sombre, surligneur jaune. Le style d'origine.</small></button>
+      <button class="skinopt" type="button" data-pick="verre"><span class="sw sw-verre"><i></i></span><b>Verre</b><small>Glassmorphisme : verre dépoli sur fond aurore.</small></button>
+      <button class="skinopt" type="button" data-pick="relief"><span class="sw sw-relief"><i></i></span><b>Relief</b><small>Skeuomorphisme : bloc-notes, cuir et minuteur LCD.</small></button>
+      <button class="skinopt" type="button" data-pick="argile"><span class="sw sw-argile"><i></i></span><b>Argile</b><small>Claymorphisme : formes pastel bombées et douces.</small></button>
+      <button class="skinopt" type="button" data-pick="tech"><span class="sw sw-tech"><i></i></span><b>Tech</b><small>Minimalisme high-tech : clair, net, premium.</small></button>
+    </div>
+    <button class="btn" id="skinClose" type="button">C'est bon</button>
+  </div>
+</div>
 
 <div class="toast" id="toast" hidden role="status" aria-live="polite">
   <span id="toastText"></span>
@@ -1177,6 +1439,26 @@ li.leaving { animation: out .38s ease forwards; }
   drawNotifBtn();
   if (canNotify && Notification.permission === "granted") { registerDaily(); checkReminders(); }
 
+  // ---------- Styles de l'appli ----------
+  var SKINS = { carnet: "#0e0e10", verre: "#1a1240", relief: "#e6dcc6", argile: "#efe7ff", tech: "#f6f7f9" };
+  function applySkin(k) {
+    if (!SKINS[k]) k = "carnet";
+    document.documentElement.setAttribute("data-skin", k);
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute("content", SKINS[k]);
+    Array.prototype.forEach.call(document.querySelectorAll(".skinopt"), function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-pick") === k ? "true" : "false");
+    });
+  }
+  applySkin(state.skin);
+  $("skinBtn").addEventListener("click", function () { $("skinSheet").hidden = false; });
+  function closeSkins() { $("skinSheet").hidden = true; }
+  $("skinScrim").addEventListener("click", closeSkins);
+  $("skinClose").addEventListener("click", closeSkins);
+  $("skinList").addEventListener("click", function (e) {
+    var b = e.target.closest("[data-pick]"); if (!b) return;
+    state.skin = b.getAttribute("data-pick"); applySkin(state.skin); save();
+  });
+
   // ---------- Transfert entre versions (page en ligne ↔ fichier) ----------
   var PREFIX = "COURSES1:";
   function exportCode() { return PREFIX + btoa(unescape(encodeURIComponent(JSON.stringify(state)))); }
@@ -1187,7 +1469,7 @@ li.leaving { animation: out .38s ease forwards; }
     if (!data || typeof data.marks !== "object") throw new Error("format");
     return {
       marks: data.marks || {}, custom: Array.isArray(data.custom) ? data.custom : [],
-      hideDone: data.hideDone !== false, dates: data.dates && typeof data.dates === "object" ? data.dates : {}
+      skin: data.skin, tab: data.tab, v: data.v || 2, dates: data.dates && typeof data.dates === "object" ? data.dates : {}
     };
   }
   $("exportBtn").addEventListener("click", function () {
