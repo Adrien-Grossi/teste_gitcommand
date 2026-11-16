@@ -149,7 +149,8 @@ li.leaving { animation: out .45s ease forwards; }
 .tools { margin-top: 32px; display: grid; gap: 14px; }
 .tools h3 { font-family: var(--font-display); font-size: 1rem; margin: 0; }
 form { display: grid; grid-template-columns: 1fr; gap: 8px; }
-input, select {
+textarea { resize: vertical; font-size: .85rem !important; word-break: break-all; }
+input, select, textarea {
   font: inherit; font-size: 1rem; width: 100%; min-height: 50px; padding: 10px 12px;
   border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); color: var(--ink);
 }
@@ -265,6 +266,13 @@ input, select {
     <h3>Nouvelle course</h3>
     <p class="small">Décoche tout pour repartir de zéro. Les articles ajoutés restent dans la liste.</p>
     <button class="btn ghost" id="resetBtn" type="button">Tout décocher</button>
+    <h3>Transférer mes données</h3>
+    <p class="small">Pour passer tes coches, tes ajouts et tes dates de la page en ligne au fichier téléchargé (ou l'inverse), ou pour en garder une copie : copie le code ici, puis colle-le dans l'autre version.</p>
+    <button class="btn ghost" id="exportBtn" type="button">Copier mes données</button>
+    <textarea id="xfer" rows="3" placeholder="Colle ici le code copié depuis l'autre version" aria-label="Code de transfert"></textarea>
+    <button class="btn ghost" id="importBtn" type="button">Importer ce code</button>
+    <p class="small" id="xferMsg" aria-live="polite"></p>
+
     <p class="small"><strong>Dater le stock</strong> fait défiler ce que tu viens d'acheter et ce que tu as déjà : dis ou tape la date (2606 = 26 juin), valide, article suivant. Les dates restent quand tu décoches tout.</p>
     <p class="small">Astuce : avant de partir, appuie sur <strong>Pas besoin</strong> pour ce que tu as déjà à la maison. Au magasin, un seul appui sur la ligne = pris.</p>
   </div>
@@ -720,6 +728,40 @@ input, select {
     try { r.start(); setMic(true); } catch (e) { rec = null; setMic(false); }
   }
   $("lbMic").addEventListener("click", function () { if (listening) stopListening(); else listen(); });
+
+  // ---------- Transfert entre versions (page en ligne ↔ fichier) ----------
+  var PREFIX = "COURSES1:";
+  function exportCode() { return PREFIX + btoa(unescape(encodeURIComponent(JSON.stringify(state)))); }
+  function importCode(code) {
+    code = (code || "").trim();
+    if (code.indexOf(PREFIX) === 0) code = code.slice(PREFIX.length);
+    var data = JSON.parse(decodeURIComponent(escape(atob(code.replace(/\s+/g, "")))));
+    if (!data || typeof data.marks !== "object") throw new Error("format");
+    return {
+      marks: data.marks || {}, custom: Array.isArray(data.custom) ? data.custom : [],
+      hideDone: data.hideDone !== false, dates: data.dates && typeof data.dates === "object" ? data.dates : {}
+    };
+  }
+  $("exportBtn").addEventListener("click", function () {
+    var ta = $("xfer"), msg = $("xferMsg"), code = exportCode();
+    ta.value = code;
+    function manual() { ta.focus(); ta.select(); msg.textContent = "Le code est sélectionné ci-dessus : copie-le, puis colle-le dans l'autre version."; }
+    try {
+      navigator.clipboard.writeText(code).then(function () {
+        msg.textContent = "Copié. Ouvre l'autre version, colle le code en bas de page et appuie sur « Importer ce code ».";
+      }, manual);
+    } catch (e) { manual(); }
+  });
+  $("importBtn").addEventListener("click", function () {
+    var msg = $("xferMsg"), next;
+    try { next = importCode($("xfer").value); }
+    catch (e) { msg.textContent = "Ce code n'est pas reconnu. Recopie-le en entier depuis « Copier mes données »."; return; }
+    var before = state; state = next; save(); render();
+    $("xfer").value = "";
+    var n = Object.keys(next.marks).length, c = next.custom.length, d = Object.keys(next.dates).filter(function (k) { return validISO(next.dates[k]); }).length;
+    msg.textContent = "Importé : " + n + " article(s) cochés, " + c + " ajout(s), " + d + " date(s).";
+    showToast("Données importées", function () { state = before; });
+  });
 
   render();
 })();
