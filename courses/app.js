@@ -760,7 +760,7 @@
     { group: "labBg", key: "lace", label: "Filets clairs", min: 0, max: 2, step: 0.02, show: (v) => (v ? pct(v) : "aucun") },
     { group: "labBg", key: "speed", label: "Vitesse", min: 0, max: 8, step: 0.1, show: (v) => (v ? "×" + v.toFixed(1) : "arrêt") },
     { group: "labGlass", key: "zoom", label: "Loupe", min: 0.7, max: 1.8, step: 0.01, show: (v) => (v === 1 ? "aucune" : v < 1 ? "réduit ×" + v.toFixed(2) : "×" + v.toFixed(2)) },
-    { group: "labGlass", key: "bezel", label: "Bombé des bords", min: 0, max: 4, step: 0.05, show: (v) => (v ? pct(v) : "plat") },
+    { group: "labGlass", key: "bezel", label: "Bombé des bords", min: 0, max: 1.5, step: 0.05, show: (v) => (v >= 1 ? "dôme parfait" : v < 0.15 ? "presque plat" : pct(v)) },
     { group: "labGlass", key: "thick", label: "Épaisseur du verre", min: 0.4, max: 5, step: 0.1, show: (v) => (v > 3 ? "très épais (" + v.toFixed(1) + ")" : v.toFixed(1)) },
     { group: "labGlass", key: "diffraction", label: "Diffraction (couleurs séparées)", min: 0, max: 2, step: 0.02, show: (v) => (v ? pct(v) : "aucune") },
     { group: "labGlass", key: "frost", label: "Verre fumé", min: 0, max: 2, step: 0.02, show: (v) => (v ? pct(v) : "clair") },

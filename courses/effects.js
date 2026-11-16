@@ -402,7 +402,10 @@
       "}",
       // Distance signée à un rectangle arrondi, et hauteur du bord en demi-cercle.
       "float rr(vec2 p, vec2 b, float r){ vec2 q = abs(p) - b + r; return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r; }",
-      "float bevel(float d, float z){ d = clamp(d, 0.0, z); return sqrt(d * (2.0*z - d)); }",
+      // Profil du bord : courbe de Lamé h = z·(1 − uᵖ)^(1/p), u = 1 − d/z (d = distance au bord).
+      // p = 2 : cercle (dôme parfait). p plus grand : sommet plus plat et bord plus raide, mais toujours
+      // une courbe continue, sans jonction entre un plateau et un bord (une jonction fait un pli visible).
+      "float bevel(float d, float z, float p){ float u = 1.0 - clamp(d / z, 0.0, 1.0); return z * pow(max(1.0 - pow(u, p), 0.0), 1.0 / p); }",
       "void main(){",
       "  vec2 pc = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y) / px;",
       "  vec3 base = bgAt(pc);",
@@ -416,21 +419,21 @@
       "  if (!hit){ gl_FragColor = vec4(base, 1.0); return; }",
       "  vec2 hs = b.zw * 0.5, lp = pc - b.xy - hs;",
       "  float sd = rr(lp, hs, rad), inside = -sd;",
-      // Largeur du bombé : 100 % = le bord courbe atteint exactement le centre de la carte, soit un dôme
-      // complet. Il n'y a alors aucune zone plate, donc la pente (et le décalage de l'image) traverse le
-      // centre sans à-coup. En dessous de 100 %, le sommet est plat, ce qui est voulu ; au-dessus, c'est
-      // le même dôme, et seule la rondeur du bord réfracté ne change plus.
-      "  float zR = clamp(min(hs.x, hs.y) * gBezel, 1.5, min(hs.x, hs.y));",
+      // Le profil couvre toujours toute la demi-hauteur (zR). Le réglage « bombé » ne change que la
+      // forme de la courbe : 100 % et plus = dôme parfait ; en dessous, la courbe se plate au centre et se
+      // raidit au bord, progressivement (exposant pp de 2 à 16). Aucun palier, donc aucun pli.
+      "  float zR = max(min(hs.x, hs.y), 1.5);",
+      "  float pp = 2.0 / clamp(gBezel, 0.125, 1.0);",
       // Pente de la surface (différences finies sur le champ de hauteur) → normale.
       // Galet : arrondi = demi-hauteur, donc la distance exacte n'a pas de pli dans le bombé.
       "  float e = 1.0;",
-      "  float hL = bevel(-rr(lp - vec2(e, 0.0), hs, rad), zR), hR = bevel(-rr(lp + vec2(e, 0.0), hs, rad), zR);",
-      "  float hU = bevel(-rr(lp - vec2(0.0, e), hs, rad), zR), hD = bevel(-rr(lp + vec2(0.0, e), hs, rad), zR);",
+      "  float hL = bevel(-rr(lp - vec2(e, 0.0), hs, rad), zR, pp), hR = bevel(-rr(lp + vec2(e, 0.0), hs, rad), zR, pp);",
+      "  float hU = bevel(-rr(lp - vec2(0.0, e), hs, rad), zR, pp), hD = bevel(-rr(lp + vec2(0.0, e), hs, rad), zR, pp);",
       "  vec2 g = vec2(hR - hL, hD - hU) / (2.0 * e);",
       "  vec3 N = normalize(vec3(-g, 1.0));",
       // Réfraction rayon par rayon : le rayon venu de l'œil entre dans le verre (loi de Snell),
       // traverse son épaisseur, et touche le fond plus loin. Chaque couleur a son indice : dispersion.
-      "  float thick = bevel(inside, zR) + zR * 0.2;",
+      "  float thick = bevel(inside, zR, pp) + zR * 0.2;",
       "  vec3 I = vec3(0.0, 0.0, -1.0);",
       "  vec3 Tr = refract(I, N, 1.0 / (1.5 - 0.07 * gDisp));",
       "  vec3 Tg = refract(I, N, 1.0 / 1.5);",
@@ -449,7 +452,7 @@
       "  }",
       // Le verre absorbe un peu là où il est épais ; la lumière du fond qui voyage dans le verre
       // ressort tout au bord, en un liseré très fin de sa propre couleur.
-      "  col *= 1.0 - 0.05 * bevel(inside, zR) / zR;",
+      "  col *= 1.0 - 0.05 * bevel(inside, zR, pp) / zR;",
       // Reflet du décor : sur le bord penché, le verre agit comme un miroir (Fresnel : plus on le voit
       // en biais, plus il réfléchit). On y voit le décor de l'autre côté du bord, retourné.
       "  vec2 nrm = N.xy / max(length(N.xy), 1e-3);",   // sens du bord, vers l'extérieur de la carte
