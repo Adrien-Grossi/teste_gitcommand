@@ -504,9 +504,11 @@ input, select, textarea {
     }
     var next = prev === act ? undefined : act;
     if (next) state.marks[id] = next; else delete state.marks[id];
-    // Un article périmé qu'on reprend (ou dont on n'a plus besoin) perd sa vieille date.
+    // Racheté : l'ancienne date ne vaut plus pour le nouveau paquet, il sera à redater.
+    // « Pas besoin » sur un article périmé : on oublie aussi sa vieille date.
     var prevDate = state.dates[id];
-    if (next && validISO(prevDate) && daysLeft(prevDate) < 0) delete state.dates[id];
+    if (next === "got" && prev !== "got" && validISO(prevDate)) delete state.dates[id];
+    else if (next && validISO(prevDate) && daysLeft(prevDate) < 0) delete state.dates[id];
     save();
     try { if (navigator.vibrate) navigator.vibrate(next === "got" ? 15 : 8); } catch (err) {}
     if (next) {
@@ -673,18 +675,18 @@ input, select, textarea {
     aisles().forEach(function (a) { a.items.forEach(function (it) { if (it.id === id) r = { name: it.name, qty: it.qty, aisle: a.name }; }); });
     return r;
   }
-  // À dater : ce qui vient d'être pris, et ce qui est « pas besoin » (déjà à la maison) sans date.
+  // À dater : seulement ce qui est à la maison (pris, ou « pas besoin ») et n'a pas encore de date.
+  // Ce qui est déjà daté, ou marqué « Pas de date », n'est jamais redemandé.
   function stockQueue() {
     var q = [];
     aisles().forEach(function (a) { a.items.forEach(function (it) {
       var m = state.marks[it.id], d = state.dates[it.id];
-      if (d === "none") return;
-      if (m === "got" || (m === "skip" && !d)) q.push(it.id);
+      if ((m === "got" || m === "skip") && !d) q.push(it.id);
     }); });
     return q;
   }
   function openLabeler(ids) {
-    if (!ids.length) { showToast("Rien à dater : coche d'abord ce que tu as acheté ou déjà à la maison.", null); return; }
+    if (!ids.length) { showToast("Tout est déjà daté. Les prochains articles cochés apparaîtront ici.", null); return; }
     lb.queue = ids; lb.pos = 0; lb.saved = 0; lb.misses = 0;
     lb.voice = !DC; // mains libres : le micro s'ouvre tout seul (ou explique pourquoi il ne peut pas)
     if (DC) startCapDictation(); // appelé directement depuis le clic, comme la dictée l'exige
