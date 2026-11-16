@@ -209,15 +209,18 @@
       const lg = lc.getContext("2d"), limg = lg.createImageData(w, h), lpx = limg.data;
       const rim = bezel * 1.4;
       const shrink = 1 - 1 / zoom;
+      const soft = Math.max(2, bezel * 0.4);   // douceur du passage d'un côté à l'autre
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
           const ox = x + 0.5 - w / 2, oy = y + 0.5 - h / 2;
-          const qx = Math.abs(ox) - (w / 2 - r), qy = Math.abs(oy) - (h / 2 - r);
-          const outside = Math.hypot(Math.max(qx, 0), Math.max(qy, 0));
-          const depth = -(outside + Math.min(Math.max(qx, qy), 0) - r);   // distance au bord, vers l'intérieur
-          let nx = 0, ny = 0;
-          if (qx > 0 && qy > 0) { nx = qx / outside; ny = qy / outside; } else if (qx > qy) nx = 1; else ny = 1;
-          nx *= Math.sign(ox) || 1; ny *= Math.sign(oy) || 1;
+          // Distance au bord « adoucie » : un minimum lissé des distances aux quatre côtés.
+          // Sa direction (vers le bord) tourne en douceur d'un côté à l'autre : pas d'arête en diagonale.
+          const el = Math.exp(-(x + 0.5) / soft), er = Math.exp(-(w - x - 0.5) / soft);
+          const et = Math.exp(-(y + 0.5) / soft), eb = Math.exp(-(h - y - 0.5) / soft);
+          const sum = el + er + et + eb;
+          const depth = -soft * Math.log(sum);
+          let nx = (er - el) / sum, ny = (eb - et) / sum;
+          const len = Math.hypot(nx, ny) || 1; nx /= len; ny /= len;
           // pente d'un bord en quart de cercle : (1 - t) / √(1 - (1 - t)²), bornée tout au bord
           const t = Math.max(0.06, Math.min(1, depth / bezel)), u = 1 - t;
           const edge = depth < bezel ? (u / Math.sqrt(1 - u * u)) / 3 * bezel : 0;
@@ -252,7 +255,8 @@
       }
       // Bombé proportionné : fort sur les cartes, discret sur les éléments étroits (pavé, pastilles), sinon l'image se déchire.
       const small = w < 200 || h < 44;
-      const bezel = Math.max(4, Math.min(lens && !small ? 32 : 14, Math.min(w, h) * (small ? 0.22 : 0.45)) * glass.bezel);
+      // le bombé ne dépasse jamais la moitié de la carte (sinon les deux bords se chevauchent)
+      const bezel = Math.min(Math.min(w, h) * 0.48, Math.max(4, Math.min(lens && !small ? 32 : 14, Math.min(w, h) * (small ? 0.22 : 0.45)) * glass.bezel));
       const zoom = lens && !small ? glass.zoom : 1;
       const range = bezel + (Math.max(w, h) / 2) * (1 - 1 / zoom);
       const scale = range * 2;
@@ -264,16 +268,16 @@
       const m = this.maps(w, h, r, bezel, zoom, range);
       const img = (href, result) => '<feImage href="' + href + '" x="0" y="0" width="' + w + '" height="' + h + '" preserveAspectRatio="none" result="' + result + '"/>';
       // éclaircit la couleur du fond sans la blanchir (pas de décalage vers le blanc)
-      const lift = '<feFuncR type="gamma" amplitude="1.9" exponent="0.8"/><feFuncG type="gamma" amplitude="1.9" exponent="0.8"/><feFuncB type="gamma" amplitude="1.9" exponent="0.8"/>';
+      const lift = '<feFuncR type="gamma" amplitude="1.45" exponent="0.9"/><feFuncG type="gamma" amplitude="1.45" exponent="0.9"/><feFuncB type="gamma" amplitude="1.45" exponent="0.9"/>';
       f.innerHTML = img(m.map, "map") +
-        // Dispersion : chaque couleur est déviée avec une force différente (le bleu jusqu'à 70 % de moins que le rouge).
+        // Dispersion : chaque couleur est déviée avec une force différente (au maximum, le bleu presque plus).
         // L'écart est proportionnel à la déviation : nul au centre, de plus en plus fort vers les bords.
-        channel(0, scale) + channel(1, scale * (1 - 0.35 * glass.diffraction)) + channel(2, scale * (1 - 0.7 * glass.diffraction)) +
+        channel(0, scale) + channel(1, scale * (1 - 0.45 * glass.diffraction)) + channel(2, scale * (1 - 0.9 * glass.diffraction)) +
         '<feBlend in="c0" in2="c1" mode="screen" result="rg"/><feBlend in="rg" in2="c2" mode="screen" result="rgb"/>' +
         '<feGaussianBlur in="rgb" stdDeviation="0.5" result="clear"/>' +
         img(m.light, "lightmask") +
         '<feGaussianBlur in="SourceGraphic" stdDeviation="7" result="soft"/>' +
-        '<feColorMatrix in="soft" type="saturate" values="2.6" result="sat"/>' +
+        '<feColorMatrix in="soft" type="saturate" values="1.9" result="sat"/>' +
         '<feComponentTransfer in="sat" result="bright">' + lift + '</feComponentTransfer>' +
         '<feComposite in="bright" in2="lightmask" operator="in" result="glow"/>' +
         '<feBlend in="glow" in2="clear" mode="screen"/>';
@@ -336,11 +340,14 @@
    * entre elles, et qui bougent très lentement. Courbes douces, sans flou ni arête.
    * Calculé par la carte graphique (WebGL, sans bibliothèque), en résolution réduite et à 20 images/s
    * pour ménager la batterie. Si WebGL manque, les disques de app.css restent en fond.          */
+  // Éléments qui projettent une caustique sur le fond (les barres et les petits boutons, non).
+  const CAUSTIC = ".rows li, .card, .bigcta, .datebox";
   const fluid = {
     canvas: null, gl: null, on: false, raf: 0, last: 0, time: 0,
     FRAG: [
       "precision highp float;",
       "uniform vec2 res; uniform float t, scroll, oct, warp, size, fusion, lace, ncol;",
+      "uniform vec4 cards[24]; uniform float ncard, px;",   // cartes en verre à l'écran (pixels CSS) ; px = pixels du canvas par pixel CSS
       "uniform vec3 cols[8];",
       "float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }",
       "float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);",
@@ -362,6 +369,22 @@
       "  vec3 c = mix(pal(i), pal(i + 1.0), smoothstep(0.5 - fusion*0.5, 0.5 + fusion*0.5, fr));",   // fusion : franc → fondu
       "  c = mix(c, vec3(1.0, 0.96, 0.92), smoothstep(0.03, 0.0, abs(fr - 0.5)) * lace);",           // filet clair à chaque frontière
       "  c *= 0.94 + 0.08 * fbm(p * 1.5 + r);",                               // légère matière
+      // Le verre posé sur le fond : sous chaque carte, une ombre de contact légère et serrée,
+      // et la lumière concentrée juste en dessous (caustique), de la couleur du fond.
+      "  vec2 pc = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y) / px;",   // ce pixel, en pixels CSS
+      "  float shade = 0.0, focus = 0.0;",
+      "  for (int j = 0; j < 24; j++){",
+      "    if (float(j) >= ncard) break;",
+      "    vec4 b = cards[j]; vec2 hs = b.zw * 0.5, ctr = b.xy + hs;",
+      "    float rad = min(hs.y, 22.0);",
+      "    vec2 dd = abs(pc - ctr - vec2(0.0, 4.0)) - hs + rad;",
+      "    float sd = length(max(dd, 0.0)) + min(max(dd.x, dd.y), 0.0) - rad;",
+      "    float below = smoothstep(b.y + b.w * 0.3, b.y + b.w, pc.y);",          // l'ombre ne monte pas au-dessus de la carte
+      "    shade = max(shade, exp(-max(sd, 0.0) / 6.0) * 0.24 * below);",
+      "    vec2 e = (pc - vec2(ctr.x, b.y + b.w + b.w * 0.22)) / vec2(hs.x * 0.92, b.w * 0.42);",
+      "    focus += smoothstep(1.0, 0.0, length(e)) * 0.55;",
+      "  }",
+      "  c = c * (1.0 - shade) + c * focus * 1.1 + focus * 0.06;",
       "  gl_FragColor = vec4(c, 1.0);",
       "}"
     ].join("\n"),
@@ -394,7 +417,7 @@
       const loc = gl.getAttribLocation(prog, "a");
       gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       this.u = {};
-      for (const name of ["res", "t", "scroll", "oct", "warp", "size", "fusion", "lace", "ncol", "cols"]) this.u[name] = gl.getUniformLocation(prog, name);
+      for (const name of ["res", "t", "scroll", "oct", "warp", "size", "fusion", "lace", "ncol", "cols", "cards", "ncard", "px"]) this.u[name] = gl.getUniformLocation(prog, name);
       Object.assign(this, { canvas, gl });
       this.onResize = () => {
         const k = 0.65;  // résolution réduite : les courbes restent douces, le téléphone respire
@@ -406,7 +429,10 @@
     },
     draw(now) {
       this.raf = requestAnimationFrame((n) => this.draw(n));
-      if (now - this.last < 50) return;   // 20 images par seconde suffisent pour un mouvement aussi lent
+      // 20 images par seconde suffisent pour un mouvement aussi lent ; pendant un défilement,
+      // on passe à toutes les images pour que la lumière sous les cartes les suive sans retard.
+      const moving = scrollY !== this.lastScroll; this.lastScroll = scrollY;
+      if (!moving && now - this.last < 50) return;
       this.time += ((now - this.last) / 1000) * glass.speed;   // la vitesse de l'atelier (0 = arrêt)
       this.last = now;
       const gl = this.gl, u = this.u, cols = glass.colors.slice(0, 8);
@@ -422,6 +448,16 @@
       gl.uniform1f(u.lace, glass.lace);
       gl.uniform1f(u.ncol, cols.length);
       gl.uniform3fv(u.cols, rgb);
+      // Les cartes en verre visibles, pour dessiner sous elles l'ombre de contact et la caustique.
+      const boxes = new Float32Array(96); let n = 0;
+      for (const el of document.querySelectorAll(CAUSTIC)) {
+        if (n === 24) break;
+        const b = el.getBoundingClientRect();
+        if (!b.width || b.bottom < -40 || b.top > innerHeight + 40) continue;
+        if (el.checkVisibility && !el.checkVisibility({ visibilityProperty: true })) continue;   // cartes masquées (labo, écran Ranger)
+        boxes.set([b.left, b.top, b.width, b.height], n++ * 4);
+      }
+      gl.uniform4fv(u.cards, boxes); gl.uniform1f(u.ncard, n); gl.uniform1f(u.px, this.canvas.width / innerWidth);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     },
     stop() {

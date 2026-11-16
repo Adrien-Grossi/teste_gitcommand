@@ -376,6 +376,9 @@ body.lab-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
   --glass-shine: none;
   --glass-light: inset 0 -2px 4px rgba(0,0,30,.22), 0 14px 30px rgba(2,4,24,.3);
 }
+/* Quand le fond fluide tourne, c'est lui qui dessine l'ombre de contact et la lumière concentrée
+   sous chaque carte : plus d'ombre portée sombre, qui donnait l'impression de cartes collées. */
+:root.liquid.fx-fluid[data-skin="verre"] { --glass-light: inset 0 -2px 4px rgba(0,0,30,.18); }
 @keyframes drift { to { transform: translate3d(8vw, 6vh, 0) scale(1.12) rotate(18deg); } }
 
 /* La plaque de verre */
