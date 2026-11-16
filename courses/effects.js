@@ -48,6 +48,7 @@
   function setGlass(p) {
     Object.assign(glass, p);
     document.documentElement.style.setProperty("--frost-tint", "rgba(255,255,255," + (glass.frost * 0.16).toFixed(3) + ")");
+    document.documentElement.style.setProperty("--iris", (glass.diffraction * 0.85).toFixed(2));   // liseré arc-en-ciel (app.css)
     liquid.rebuild();
   }
 
@@ -205,7 +206,7 @@
       const g = c.getContext("2d"), img = g.createImageData(w, h), px = img.data;
       const lc = document.createElement("canvas"); lc.width = w; lc.height = h;
       const lg = lc.getContext("2d"), limg = lg.createImageData(w, h), lpx = limg.data;
-      const rim = bezel * 1.3;
+      const rim = bezel * 1.7;   // le halo coloré déborde un peu plus loin que le bombé
       const shrink = 1 - 1 / zoom;
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
@@ -224,7 +225,7 @@
           px[i] = 128 + Math.max(-1, Math.min(1, dx / range)) * 127;
           px[i + 1] = 128 + Math.max(-1, Math.min(1, dy / range)) * 127;
           px[i + 2] = 128; px[i + 3] = 255;
-          const glow = depth < rim ? Math.min(1, Math.pow(1 - Math.max(depth, 0) / rim, 1.6) * (oy < 0 ? 1 : 0.55) * (0.4 + 0.6 * Math.abs(ny)) * glass.light) : 0;
+          const glow = depth < rim ? Math.min(1, Math.pow(1 - Math.max(depth, 0) / rim, 1.2) * (oy < 0 ? 1 : 0.6) * (0.45 + 0.55 * Math.abs(ny)) * glass.light) : 0;
           lpx[i] = lpx[i + 1] = lpx[i + 2] = 255; lpx[i + 3] = glow * 255;
         }
       }
@@ -259,14 +260,16 @@
       for (const [k, v] of Object.entries({ x: 0, y: 0, width: w, height: h, filterUnits: "userSpaceOnUse", "color-interpolation-filters": "sRGB" })) f.setAttribute(k, v);
       const m = this.maps(w, h, r, bezel, zoom, range);
       const img = (href, result) => '<feImage href="' + href + '" x="0" y="0" width="' + w + '" height="' + h + '" preserveAspectRatio="none" result="' + result + '"/>';
-      const lift = '<feFuncR type="linear" slope="1.5" intercept="0.1"/><feFuncG type="linear" slope="1.5" intercept="0.1"/><feFuncB type="linear" slope="1.5" intercept="0.1"/>';
+      // éclaircit la couleur du fond sans la blanchir (pas de décalage vers le blanc)
+      const lift = '<feFuncR type="gamma" amplitude="1.9" exponent="0.8"/><feFuncG type="gamma" amplitude="1.9" exponent="0.8"/><feFuncB type="gamma" amplitude="1.9" exponent="0.8"/>';
       f.innerHTML = img(m.map, "map") +
-        channel(0, scale) + channel(1, scale * (1 - 0.16 * glass.diffraction)) + channel(2, scale * (1 - 0.32 * glass.diffraction)) +
+        // diffraction : le vert et le bleu sont moins déviés que le rouge (jusqu'à moitié moins au maximum)
+        channel(0, scale) + channel(1, scale * (1 - 0.25 * glass.diffraction)) + channel(2, scale * (1 - 0.5 * glass.diffraction)) +
         '<feBlend in="c0" in2="c1" mode="screen" result="rg"/><feBlend in="rg" in2="c2" mode="screen" result="rgb"/>' +
         '<feGaussianBlur in="rgb" stdDeviation="0.5" result="clear"/>' +
         img(m.light, "lightmask") +
         '<feGaussianBlur in="SourceGraphic" stdDeviation="7" result="soft"/>' +
-        '<feColorMatrix in="soft" type="saturate" values="1.8" result="sat"/>' +
+        '<feColorMatrix in="soft" type="saturate" values="2.6" result="sat"/>' +
         '<feComponentTransfer in="sat" result="bright">' + lift + '</feComponentTransfer>' +
         '<feComposite in="bright" in2="lightmask" operator="in" result="glow"/>' +
         '<feBlend in="glow" in2="clear" mode="screen"/>';

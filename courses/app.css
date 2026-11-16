@@ -293,17 +293,21 @@ body.sheet-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
 @media (max-width: 380px) { .skins { grid-template-columns: 1fr; } .swatch { height: 52px; } }
 
 /* Atelier du verre : panneau en bas ; le haut reste transparent pour voir les vraies cartes et la carte test. */
+/* Atelier du verre : un labo isolé. L'appli est masquée ; il ne reste que le fond animé,
+   une carte type au milieu, et les réglages en bas. */
+body.lab-open { overflow: hidden; }
+body.lab-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
 .lab {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 35; height: min(68vh, 620px);
-  display: flex; flex-direction: column; gap: 10px;
-  padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
-  background: linear-gradient(to bottom, rgba(10,15,44,0), rgba(10,15,44,.6) 70px);   /* simple fond, pas de flou : la carte test voit le décor */
+  position: fixed; inset: 0; z-index: 35; display: flex; flex-direction: column;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
 }
+.lab-stage { flex: 1; min-height: 140px; display: grid; place-items: center; }
+.lab-stage .rows { width: min(100%, 420px); }
 .lab-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .lab-head h2 { font-family: var(--font-display); margin: 0; font-size: 1.3rem; }
-.lab-sample { flex: none; }
+
 .lab-body {
-  flex: 1; min-height: 0; overflow-y: auto; display: grid; align-content: start; gap: 14px;
+  flex: none; height: min(56vh, 520px); overflow-y: auto; display: grid; align-content: start; gap: 14px;
   margin: 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px))); padding: 16px max(16px, env(safe-area-inset-left, 0px)) calc(20px + env(safe-area-inset-bottom, 0px));
   background: rgba(10,15,44,.9); border-radius: 22px 22px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,.3);
   -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
@@ -365,7 +369,13 @@ body.sheet-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
 /* Quand le fond fluide (effects.js) tourne, il remplace les disques. */
 :root.fx-fluid .backdrop { display: none; }
 /* Avec la réfraction, la lumière des bords vient du fond (effects.js) : le reflet blanc se fait discret. */
-:root.liquid[data-skin="verre"] { --glass-gloss: radial-gradient(70% 45% at 30% -10%, rgba(255,255,255,.14), transparent 60%); }
+/* Avec la réfraction, toute la lumière des cartes vient du fond (effects.js) : plus aucun reflet blanc,
+   seulement l'ombre portée et un léger creux sous le bord. */
+:root.liquid[data-skin="verre"] {
+  --glass-gloss: none;
+  --glass-shine: none;
+  --glass-light: inset 0 -2px 4px rgba(0,0,30,.22), 0 14px 30px rgba(2,4,24,.3);
+}
 @keyframes drift { to { transform: translate3d(8vw, 6vh, 0) scale(1.12) rotate(18deg); } }
 
 /* La plaque de verre */
@@ -373,6 +383,15 @@ body.sheet-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
 [data-skin="verre"] :is(.rows li, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .tabs, .toast) {
   background: var(--glass-shine), var(--glass-fill); border: 0; box-shadow: var(--glass-light);
   -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost);
+}
+/* Irisation : la lumière décomposée dans l'épaisseur du bombé, en fin liseré arc-en-ciel flou.
+   Son intensité (--iris) suit le réglage « Diffraction » de l'atelier. */
+[data-skin="verre"] :is(.rows li, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta)::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 2px; pointer-events: none;
+  background: conic-gradient(from 200deg, #ff4d7d, #ffcf4d, #4dffa0, #4dd8ff, #8f6bff, #ff4d7d);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  filter: blur(1.2px); mix-blend-mode: screen; opacity: var(--iris, .4);
 }
 /* Les reflets du bombé : une tache allongée en haut, une lueur en bas (lumière qui traverse le verre) */
 [data-skin="verre"] :is(.rows li, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta, .tabs, .toast)::after {

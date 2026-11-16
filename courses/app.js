@@ -724,7 +724,7 @@
     if (meta) meta.setAttribute("content", SKINS[state.skin]);
     document.querySelectorAll("[data-pick]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.pick === state.skin)));
     $("labBtn").hidden = state.skin !== "verre";
-    if (state.skin !== "verre") $("lab").hidden = true;
+    if (state.skin !== "verre") closeLab();
     fx("setGlass", state.glass);
     fx("setSkin", state.skin);
   }
@@ -784,11 +784,13 @@
     if (e.target.closest("[data-add]")) g.colors.push(EXTRA_COLORS.find((c) => !g.colors.includes(c)) || "#ffffff");
     else if (e.target.closest("[data-rm]")) g.colors.splice(+e.target.closest("[data-rm]").dataset.rm, 1);
     else if (e.target.closest("#labReset")) state.glass = copyGlass(GLASS_DEFAULTS);
-    else if (e.target.closest("#labClose")) { $("lab").hidden = true; return; }
+    else if (e.target.closest("#labClose")) { closeLab(); return; }
     else return;
     drawLab(); pushGlass();
   });
-  $("labBtn").addEventListener("click", () => { $("picker").hidden = true; drawLab(); $("lab").hidden = false; });
+  function openLab() { $("picker").hidden = true; drawLab(); $("lab").hidden = false; document.body.classList.add("lab-open"); }
+  function closeLab() { $("lab").hidden = true; document.body.classList.remove("lab-open"); }
+  $("labBtn").addEventListener("click", openLab);
 
   /* 13. Démarrage ---------------------------------------------------------------------------- */
   let wakeLock = null;
