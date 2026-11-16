@@ -670,11 +670,13 @@ input, select, textarea {
     if (!ids.length) { showToast("Rien à dater : coche d'abord ce que tu as acheté ou déjà à la maison.", null); return; }
     lb.queue = ids; lb.pos = 0; lb.saved = 0; lb.misses = 0;
     lb.voice = !!SR; // mains libres : le micro s'ouvre tout seul
+    if (DC) startCapDictation(); // appelé directement depuis le clic, comme la dictée l'exige
     sheet.hidden = false; document.body.style.overflow = "hidden";
     showItem();
   }
   function closeLabeler() {
-    cancelAuto(); stopListening(); sheet.hidden = true; document.body.style.overflow = "";
+    cancelAuto(); stopListening(); sheet.hidden = true;
+    if (DC && dcOn) DC.stop().catch(function () {}); document.body.style.overflow = "";
     save(); render();
     if (lb.saved) showToast(lb.saved + (lb.saved > 1 ? " dates enregistrées" : " date enregistrée"), null);
   }
@@ -686,7 +688,7 @@ input, select, textarea {
     $("lbName").textContent = info.name + (info.qty ? " · " + info.qty : "");
     $("lbCurrent").textContent = validISO(d) ? "Date actuelle : " + shortDate(d) + " (" + rel(daysLeft(d)) + ")" : "";
     $("lbPrev").disabled = lb.pos === 0;
-    cancelAuto(); lb.buf = ""; lb.msg = ""; $("lbDictate").value = ""; drawDate();
+    cancelAuto(); lb.buf = ""; lb.msg = ""; heard = ""; clearTimeout(heardT); $("lbDictate").value = ""; drawDate();
     if (lb.voice) listen();
   }
   // Date entendue : validation automatique après 1,6 s, sauf si on touche pour corriger.
@@ -759,14 +761,25 @@ input, select, textarea {
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition, rec = null, listening = false;
   if (SR) $("lbMic").hidden = false; else $("lbKbd").hidden = false;
   function setMic(on) {
+    if (DC) return; // la dictée claude.ai gère son propre état
     listening = on; $("lbMic").classList.toggle("on", on);
     $("lbMicText").textContent = on ? "J'écoute… dis la date" : lb.voice ? "Dire la date" : "Micro en pause · toucher pour reprendre";
   }
   function stopListening() { var r = rec; rec = null; if (r) { try { r.abort(); } catch (e) {} } setMic(false); }
   function norm(s) { return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
   // Commandes vocales en plus des dates.
+  // Une phrase entendue : commande, ou date. final = afficher « pas compris » tout de suite si rien ne colle.
+  function handleHeard(list, final) {
+    for (var i = 0; i < list.length; i++) if (voiceCommand(list[i])) return true;
+    var iso = null;
+    for (i = 0; i < list.length && !iso; i++) iso = parseSpoken(list[i]);
+    if (iso) { lb.buf = isoToBuf(iso); lb.msg = ""; drawDate(); armAuto(iso); return true; }
+    if (final) { lb.buf = ""; lb.msg = "Pas compris « " + list[0].trim() + " ». Redis, par exemple « 26 juin »."; drawDate(); }
+    return false;
+  }
   function voiceCommand(said) {
     var t = norm(said);
+    if (lb.autoT && /\b(non|corrige|attends|attend)\b/.test(t)) { cancelAuto(); lb.buf = ""; lb.msg = ""; drawDate(); return true; }
     if (/(pas|sans|aucune) (de )?date|pas besoin|ne perime pas/.test(t)) { setDate("none"); return true; }
     if (/\b(passe|passer|suivant)\b/.test(t)) { skipItem(); return true; }
     if (/\b(retour|precedent)\b/.test(t)) { prevItem(); return true; }
@@ -780,12 +793,10 @@ input, select, textarea {
     rec = r; lb.relisten = false; r.lang = "fr-FR"; r.interimResults = false; r.maxAlternatives = 5;
     r.onresult = function (ev) {
       if (rec !== r) return;
-      var alts = ev.results[0], iso = null, said = alts[0].transcript;
+      var alts = ev.results[0], list = [];
       lb.misses = 0;
-      for (var i = 0; i < alts.length; i++) if (voiceCommand(alts[i].transcript)) return;
-      for (i = 0; i < alts.length && !iso; i++) iso = parseSpoken(alts[i].transcript);
-      if (iso) { lb.buf = isoToBuf(iso); lb.msg = ""; drawDate(); armAuto(iso); }
-      else { lb.buf = ""; lb.msg = "Pas compris « " + said + " ». Redis, par exemple « 26 juin »."; lb.relisten = true; drawDate(); }
+      for (var i = 0; i < alts.length; i++) list.push(alts[i].transcript);
+      if (!handleHeard(list, true)) lb.relisten = true;
     };
     r.onerror = function (ev) {
       if (rec !== r) return;
@@ -807,9 +818,47 @@ input, select, textarea {
     try { r.start(); setMic(true); } catch (e) { rec = null; setMic(false); }
   }
   $("lbMic").addEventListener("click", function () {
+    if (DC) { if (dcOn) DC.stop().catch(function () {}); else startCapDictation(); return; }
     if (listening) { lb.voice = false; stopListening(); }
     else { lb.voice = true; lb.misses = 0; cancelAuto(); listen(); }
   });
+
+  // Dictée de claude.ai (page ouverte dans Chrome) : une seule écoute continue pour toute la série.
+  var DC = null, dcOn = false, heard = "", heardT = null;
+  function startCapDictation() {
+    if (!DC) return;
+    DC.start({ language: "fr" }).catch(function (e) {
+      var c = e && e.code;
+      if (c === "not_granted") lb.msg = "Micro refusé. Tu peux le réactiver dans le menu Autorisations de la page.";
+      else if (c === "unavailable") { lb.msg = "Dictée indisponible ici. Tape la date."; $("lbMic").hidden = true; }
+      else if (c && c !== "stopped" && c !== "dismissed") lb.msg = "Le micro n'a pas démarré. Touche le bouton micro.";
+      if (!sheet.hidden) drawDate();
+    });
+  }
+  try {
+    if (window.claude && window.claude.use) window.claude.use("dictation").then(function (d) {
+      if (!d) return;
+      DC = d; SR = null;
+      $("lbMic").hidden = false; $("lbKbd").hidden = true;
+      d.onState(function (s) {
+        dcOn = s.state === "listening" || s.state === "starting";
+        listening = dcOn; $("lbMic").classList.toggle("on", dcOn);
+        $("lbMicText").textContent = dcOn ? "J'écoute… dis la date" : "Dire la date";
+      });
+      d.onPartial(function (x) {
+        if (sheet.hidden || lb.autoT || !x.text) return;
+        var pv = $("lbPreview"); pv.className = "preview"; pv.textContent = "« " + (heard + " " + x.text).trim() + " »";
+      });
+      d.onFinal(function (x) {
+        if (sheet.hidden || !x.text.trim()) return;
+        heard = (heard + " " + x.text).trim();
+        clearTimeout(heardT);
+        if (handleHeard([heard], false)) { heard = ""; return; }
+        // La date arrive parfois en deux morceaux (« 26 » puis « juin ») : on attend un peu avant de dire « pas compris ».
+        heardT = setTimeout(function () { if (heard) { handleHeard([heard], true); heard = ""; } }, 2200);
+      });
+    }).catch(function () {});
+  } catch (e) {}
 
   // Dictée par le clavier du téléphone : le texte arrive dans le champ, on le lit au fur et à mesure.
   var dict = $("lbDictate");
