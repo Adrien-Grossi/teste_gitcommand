@@ -44,8 +44,12 @@
     colors: ["#293dd9", "#8040f2", "#ff5c8c", "#ff8f4d", "#1ac7cc"],
     complexity: 3, size: 1, fusion: 0.24, lace: 0.4, speed: 1,
     zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, light: 1, round: 1,
-    // lumière : position autour de la carte (x gauche→droite, y haut→bas, z derrière→devant, de -1 à 1)
-    lightX: -0.35, lightY: -0.6, lightZ: -0.55, lightPower: 0.6, lightSharp: 0.5, lightColor: "#fff4e6"
+    // Sources lumineuses posées dans le fond (1 à 3) : x, y sur l'écran (0 à 1), taille et
+    // profondeur derrière le verre (0 à 1), intensité (0 à 2), couleur.
+    lights: [
+      { x: 0.12, y: 0.12, color: "#ffcf9a", power: 0.9, size: 0.45, depth: 0.5 },
+      { x: 0.85, y: 0.64, color: "#9fd8ff", power: 0.6, size: 0.35, depth: 0.6 }
+    ]
   };
   function setGlass(p) {
     Object.assign(glass, p);
@@ -364,8 +368,8 @@
       "uniform vec2 res; uniform float t, scroll, oct, warp, size, fusion, lace, ncol, px;",
       "uniform vec3 cols[8];",
       "uniform vec4 cards[" + MAX_CARDS + "]; uniform float crad[" + MAX_CARDS + "]; uniform float ncard;",
-      "uniform float gZoom, gBezel, gDisp, gFrost, gLight, gRound, gLightPow, gSharp;",
-      "uniform vec3 gLightDir, gLightCol;",
+      "uniform float gZoom, gBezel, gDisp, gFrost, gLight, gRound;",
+      "uniform vec4 lPos[3], lCol[3]; uniform float nlight;",   // sources du fond : (x, y, profondeur, rayon) en pixels CSS ; (couleur, intensité)
       "float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }",
       "float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);",
       "  return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }",
@@ -386,7 +390,15 @@
       "  float i = floor(k), fr = fract(k);",
       "  vec3 c = mix(pal(i), pal(i + 1.0), smoothstep(0.5 - fusion*0.5, 0.5 + fusion*0.5, fr));",
       "  c = mix(c, vec3(1.0, 0.96, 0.92), smoothstep(0.03, 0.0, abs(fr - 0.5)) * lace);",
-      "  return c * (0.94 + 0.08 * fbm(p * 1.5 + r));",
+      "  c *= 0.94 + 0.08 * fbm(p * 1.5 + r);",
+      // les sources lumineuses font partie du fond : un cœur lumineux et un halo large
+      "  for (int j = 0; j < 3; j++){",
+      "    if (float(j) >= nlight) break;",
+      "    float d = length(css - lPos[j].xy) / lPos[j].w;",
+      "    vec3 glow = lCol[j].rgb * lCol[j].a * (exp(-d * d) * 0.6 + exp(-d * 1.2) * 0.22);",
+      "    c = 1.0 - (1.0 - c) * (1.0 - clamp(glow, 0.0, 1.0));",   // mode écran : éclaircit sans brûler en blanc
+      "  }",
+      "  return c;",
       "}",
       // Distance signée à un rectangle arrondi, et hauteur du bord en demi-cercle.
       "float rr(vec2 p, vec2 b, float r){ vec2 q = abs(p) - b + r; return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r; }",
@@ -433,19 +445,21 @@
       // Le verre absorbe un peu là où il est épais ; la lumière du fond qui voyage dans le verre
       // ressort tout au bord, en un liseré très fin de sa propre couleur.
       "  col *= 1.0 - 0.05 * bevel(inside, zR) / zR;",
-      // La lumière réglée dans l'atelier (direction de la carte vers la lumière ; x droite, y bas, z vers l'œil).
-      "  vec3 Ld = normalize(gLightDir), V = vec3(0.0, 0.0, 1.0);",
-      "  float shin = mix(3.0, 120.0, gSharp * gSharp);",
-      // devant : la lumière se reflète sur la surface courbe (Blinn-Phong)
-      "  float lit = pow(max(dot(N, normalize(Ld + V)), 0.0), shin) * max(Ld.z, 0.0) * 1.3;",
-      // derrière : elle entre par l'arrière plat, traverse le verre, ressort par l'avant courbe ;
-      // on la voit là où la courbe la renvoie vers l'œil (réfraction exacte, réflexion totale incluse)
-      "  vec3 Din = refract(-Ld, vec3(0.0, 0.0, -1.0), 1.0 / 1.5);",
-      "  vec3 Dout = refract(Din, -N, 1.5);",
-      "  lit += pow(max(dot(Dout, V), 0.0), shin * 0.6) * max(-Ld.z, 0.0) * 0.45;",   // à travers le verre : moins fort qu'un reflet direct
-      // sur le côté : un éclat rasant sur la tranche tournée vers la lumière
-      "  lit += pow(max(dot(N.xy, normalize(Ld.xy + 1e-4)), 0.0), 2.0) * pow(1.0 - N.z, 1.5) * (1.0 - abs(Ld.z)) * 1.3;",
-      "  col += gLightCol * lit * gLightPow;",
+      // Lumière des sources du fond à travers le verre : depuis la vraie position de chaque source
+      // (derrière le verre), le rayon entre par l'arrière plat, traverse, ressort par l'avant courbe.
+      // On voit un éclat là où la courbe le renvoie vers l'œil — seulement sur la partie courbe
+      // (sur le plat, la source se voit déjà à travers le verre, par la réfraction du fond).
+      "  vec3 V = vec3(0.0, 0.0, 1.0);",
+      "  float curve = smoothstep(0.02, 0.35, 1.0 - N.z);",
+      "  for (int j = 0; j < 3; j++){",
+      "    if (float(j) >= nlight) break;",
+      "    vec3 L = normalize(vec3(lPos[j].xy - pc, -lPos[j].z));",
+      "    vec3 Din = refract(-L, vec3(0.0, 0.0, -1.0), 1.0 / 1.5);",
+      "    vec3 Dout = refract(Din, -N, 1.5);",
+      "    float glint = pow(max(dot(Dout, V), 0.0), 18.0) * curve;",
+      "    float near = 1.0 / (1.0 + pow(length(lPos[j].xy - pc) / (lPos[j].w * 4.0), 2.0));",   // plus faible quand la source est loin
+      "    col = 1.0 - (1.0 - col) * (1.0 - clamp(lCol[j].rgb * lCol[j].a * glint * near * 1.2 * gLight, 0.0, 1.0));",
+      "  }",
       "  col += col * exp(-inside / 1.4) * 0.45 * gLight;",
       "  gl_FragColor = vec4(mix(base, col, 1.0 - smoothstep(-0.8, 0.6, sd)), 1.0);",   // bord lissé
       "}"
@@ -481,7 +495,7 @@
       gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       this.u = {};
       for (const name of ["res", "t", "scroll", "oct", "warp", "size", "fusion", "lace", "ncol", "px", "cols", "cards", "crad", "ncard",
-        "gZoom", "gBezel", "gDisp", "gFrost", "gLight", "gRound", "gLightPow", "gSharp", "gLightDir", "gLightCol"]) this.u[name] = gl.getUniformLocation(prog, name);
+        "gZoom", "gBezel", "gDisp", "gFrost", "gLight", "gRound", "lPos", "lCol", "nlight"]) this.u[name] = gl.getUniformLocation(prog, name);
       Object.assign(this, { canvas, gl });
       this.onResize = () => {
         const k = 0.85;  // un peu sous la résolution de l'écran : les bords du verre restent nets, le téléphone respire
@@ -536,10 +550,16 @@
       gl.uniform4fv(u.cards, boxes); gl.uniform1fv(u.crad, radii); gl.uniform1f(u.ncard, n);
       gl.uniform1f(u.gZoom, glass.zoom); gl.uniform1f(u.gBezel, glass.bezel); gl.uniform1f(u.gDisp, glass.diffraction);
       gl.uniform1f(u.gFrost, glass.frost); gl.uniform1f(u.gLight, glass.light); gl.uniform1f(u.gRound, glass.round);
-      gl.uniform3f(u.gLightDir, glass.lightX, glass.lightY, glass.lightZ);
-      const lc = parseInt(glass.lightColor.slice(1), 16);
-      gl.uniform3f(u.gLightCol, (lc >> 16 & 255) / 255, (lc >> 8 & 255) / 255, (lc & 255) / 255);
-      gl.uniform1f(u.gLightPow, glass.lightPower); gl.uniform1f(u.gSharp, glass.lightSharp);
+      // Sources du fond : elles dérivent lentement avec les vagues (même vitesse que le fond).
+      const lp = new Float32Array(12), lcol = new Float32Array(12), lights = glass.lights.slice(0, 3);
+      lights.forEach((l, i) => {
+        const v = parseInt(l.color.slice(1), 16);
+        lp.set([l.x * innerWidth + Math.sin(this.time * 0.11 + i * 2.1) * innerWidth * 0.04,
+                l.y * innerHeight + Math.cos(this.time * 0.09 + i * 1.3) * innerHeight * 0.03,
+                20 + l.depth * 220, Math.max(12, l.size * Math.min(innerWidth, innerHeight) * 0.45)], i * 4);
+        lcol.set([(v >> 16 & 255) / 255, (v >> 8 & 255) / 255, (v & 255) / 255, l.power], i * 4);
+      });
+      gl.uniform4fv(u.lPos, lp); gl.uniform4fv(u.lCol, lcol); gl.uniform1f(u.nlight, lights.length);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     },
     stop() {

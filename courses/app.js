@@ -63,10 +63,14 @@
     colors: ["#293dd9", "#8040f2", "#ff5c8c", "#ff8f4d", "#1ac7cc"],
     complexity: 3, size: 1, fusion: 0.24, lace: 0.4, speed: 1,
     zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, light: 1, round: 1,
-    // lumière : position autour de la carte (x gauche→droite, y haut→bas, z derrière→devant, de -1 à 1)
-    lightX: -0.35, lightY: -0.6, lightZ: -0.55, lightPower: 0.6, lightSharp: 0.5, lightColor: "#fff4e6"
+    // Sources lumineuses posées dans le fond (1 à 3) : x, y sur l'écran (0 à 1), taille et
+    // profondeur derrière le verre (0 à 1), intensité (0 à 2), couleur.
+    lights: [
+      { x: 0.12, y: 0.12, color: "#ffcf9a", power: 0.9, size: 0.45, depth: 0.5 },
+      { x: 0.85, y: 0.64, color: "#9fd8ff", power: 0.6, size: 0.35, depth: 0.6 }
+    ]
   };
-  const copyGlass = (g) => ({ ...g, colors: g.colors.slice() });
+  const copyGlass = (g) => ({ ...g, colors: g.colors.slice(), lights: g.lights.map((l) => ({ ...l })) });
   const state = { marks: {}, dates: {}, custom: [], tab: "courses", skin: "carnet", glass: copyGlass(GLASS_DEFAULTS), v: 3 };
 
   function load() {
@@ -95,8 +99,14 @@
     const colors = Array.isArray(g.colors) ? g.colors.filter((c) => /^#[0-9a-f]{6}$/i.test(c)).slice(0, 8) : [];
     if (colors.length >= 2) out.colors = colors;
     for (const c of GLASS_SLIDERS) if (typeof g[c.key] === "number") out[c.key] = Math.min(c.max, Math.max(c.min, g[c.key]));
-    for (const k of ["lightX", "lightY"]) if (typeof g[k] === "number") out[k] = Math.min(1, Math.max(-1, g[k]));
-    if (/^#[0-9a-f]{6}$/i.test(g.lightColor)) out.lightColor = g.lightColor;
+    if (Array.isArray(g.lights)) {
+      const clamp = (v, d) => (typeof v === "number" ? Math.min(LIGHT_LIMITS[d][1], Math.max(LIGHT_LIMITS[d][0], v)) : null);
+      const lights = g.lights.slice(0, 3).map((l) => isObj(l) && /^#[0-9a-f]{6}$/i.test(l.color) && {
+        x: clamp(l.x, "x") ?? 0.5, y: clamp(l.y, "y") ?? 0.3, color: l.color,
+        power: clamp(l.power, "power") ?? 0.8, size: clamp(l.size, "size") ?? 0.4, depth: clamp(l.depth, "depth") ?? 0.5
+      }).filter(Boolean);
+      out.lights = lights;
+    }
     return out;
   }
   function save() {
@@ -753,13 +763,16 @@
     { group: "labGlass", key: "diffraction", label: "Diffraction (arc-en-ciel)", min: 0, max: 1, step: 0.02, show: (v) => (v ? pct(v) : "aucune") },
     { group: "labGlass", key: "frost", label: "Verre fumé", min: 0, max: 1, step: 0.02, show: (v) => (v ? pct(v) : "clair") },
     { group: "labGlass", key: "light", label: "Lumière des bords", min: 0, max: 2, step: 0.05, show: (v) => (v ? pct(v) : "éteinte") },
-    { group: "labGlass", key: "round", label: "Arrondi des cartes", min: 0, max: 1, step: 0.02, show: (v) => (v > 0.97 ? "galet" : v < 0.03 ? "coins vifs" : pct(v)) },
-    { group: "labLight", key: "lightZ", label: "Devant ↔ derrière", min: -1, max: 1, step: 0.02, show: (v) => (v < -0.2 ? "derrière la carte" : v > 0.2 ? "devant la carte" : "sur le côté") },
-    { group: "labLight", key: "lightPower", label: "Intensité de la lumière", min: 0, max: 2, step: 0.05, show: (v) => (v ? pct(v) : "éteinte") },
-    { group: "labLight", key: "lightSharp", label: "Netteté du reflet", min: 0, max: 1, step: 0.02, show: (v) => (v < 0.2 ? "diffus" : v > 0.8 ? "piqué" : pct(v)) }
+    { group: "labGlass", key: "round", label: "Arrondi des cartes", min: 0, max: 1, step: 0.02, show: (v) => (v > 0.97 ? "galet" : v < 0.03 ? "coins vifs" : pct(v)) }
+  ];
+  const LIGHT_LIMITS = { x: [0, 1], y: [0, 1], power: [0, 2], size: [0.1, 1], depth: [0.05, 1] };
+  const LIGHT_SLIDERS = [
+    { key: "power", label: "Intensité", min: 0, max: 2, step: 0.05, show: (v) => (v ? pct(v) : "éteinte") },
+    { key: "size", label: "Taille", min: 0.1, max: 1, step: 0.02, show: pct },
+    { key: "depth", label: "Profondeur derrière le verre", min: 0.05, max: 1, step: 0.02, show: (v) => (v < 0.3 ? "tout près" : v > 0.75 ? "loin" : pct(v)) }
   ];
   const EXTRA_COLORS = ["#ffd25e", "#5fd6a8", "#ff4f6d", "#4cc9ff", "#c7f464", "#ffffff", "#ff9ff3", "#2e2a6b"];
-  for (const group of ["labBg", "labGlass", "labLight"]) {
+  for (const group of ["labBg", "labGlass"]) {
     $(group).innerHTML = GLASS_SLIDERS.filter((c) => c.group === group).map((c) =>
       '<label class="lab-row" for="lab-' + c.key + '"><span>' + c.label + ' <output id="labOut-' + c.key + '"></output></span>' +
       '<input type="range" id="lab-' + c.key + '" data-key="' + c.key + '" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '"></label>').join("");
@@ -771,23 +784,41 @@
       '<button type="button" data-rm="' + i + '" aria-label="Retirer la couleur ' + (i + 1) + '"' + (n <= 2 ? " disabled" : "") + ">×</button></span>").join("") +
       (n < 8 ? '<button class="pill" type="button" data-add>+ Couleur</button>' : "");
     for (const c of GLASS_SLIDERS) { $("lab-" + c.key).value = g[c.key]; $("labOut-" + c.key).textContent = c.show(g[c.key]); }
-    drawLightPad();
-    $("labLightColor").value = g.lightColor;
+    drawLights();
   }
-  // Pavé de lumière : on glisse le point autour de la silhouette de la carte (gauche/droite, haut/bas).
-  function drawLightPad() {
-    const dot = $("lightDot");
-    dot.style.left = (state.glass.lightX + 1) * 50 + "%";
-    dot.style.top = (state.glass.lightY + 1) * 50 + "%";
-    dot.classList.toggle("behind", state.glass.lightZ < -0.2);
+  // Sources lumineuses du fond : le pavé représente l'écran ; on touche une source pour la choisir,
+  // on la glisse pour la déplacer ; ses réglages s'affichent dessous.
+  let selLight = 0;
+  function drawLights() {
+    const lights = state.glass.lights;
+    selLight = Math.min(selLight, Math.max(0, lights.length - 1));
+    $("lightPad").innerHTML = lights.map((l, i) =>
+      '<span class="lightdot' + (i === selLight ? " sel" : "") + '" data-li="' + i + '" style="left:' + l.x * 100 + "%;top:" + l.y * 100 +
+      "%;--lc:" + l.color + '"></span>').join("");
+    $("lightList").innerHTML = lights.map((l, i) =>
+      '<span class="lab-color' + (i === selLight ? " sel" : "") + '"><input type="color" value="' + l.color + '" data-lc="' + i + '" aria-label="Couleur de la lumière ' + (i + 1) + '">' +
+      '<button type="button" data-lrm="' + i + '" aria-label="Retirer la lumière ' + (i + 1) + '">×</button></span>').join("") +
+      (lights.length < 3 ? '<button class="pill" type="button" data-ladd>+ Lumière</button>' : "");
+    const l = lights[selLight];
+    $("labLight").innerHTML = l ? '<p class="small">Lumière ' + (selLight + 1) + "</p>" + LIGHT_SLIDERS.map((c) =>
+      '<label class="lab-row" for="labL-' + c.key + '"><span>' + c.label + " <output>" + c.show(l[c.key]) + "</output></span>" +
+      '<input type="range" id="labL-' + c.key + '" data-lkey="' + c.key + '" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '" value="' + l[c.key] + '"></label>').join("")
+      : '<p class="small">Aucune lumière : seul le fond éclaire le verre.</p>';
   }
   function moveLight(e) {
+    const l = state.glass.lights[selLight]; if (!l) return;
     const r = $("lightPad").getBoundingClientRect();
-    state.glass.lightX = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1));
-    state.glass.lightY = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1));
-    drawLightPad(); pushGlass();
+    l.x = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    l.y = Math.max(0, Math.min(1, (e.clientY - r.top) / r.height));
+    const dot = $("lightPad").querySelector('[data-li="' + selLight + '"]');
+    dot.style.left = l.x * 100 + "%"; dot.style.top = l.y * 100 + "%";
+    pushGlass();
   }
-  $("lightPad").addEventListener("pointerdown", (e) => { $("lightPad").setPointerCapture(e.pointerId); moveLight(e); });
+  $("lightPad").addEventListener("pointerdown", (e) => {
+    const dot = e.target.closest("[data-li]");
+    if (dot && +dot.dataset.li !== selLight) { selLight = +dot.dataset.li; drawLights(); }
+    $("lightPad").setPointerCapture(e.pointerId); moveLight(e);
+  });
   $("lightPad").addEventListener("pointermove", (e) => { if (e.buttons) moveLight(e); });
   let labSaveTimer = 0;
   function pushGlass() {
@@ -800,9 +831,13 @@
       const c = GLASS_SLIDERS.find((x) => x.key === t.dataset.key);
       state.glass[c.key] = +t.value;
       $("labOut-" + c.key).textContent = c.show(+t.value);
-      if (c.key === "lightZ") drawLightPad();
     } else if (t.dataset.ci) state.glass.colors[+t.dataset.ci] = t.value;
-    else if (t.id === "labLightColor") state.glass.lightColor = t.value;
+    else if (t.dataset.lc) { state.glass.lights[+t.dataset.lc].color = t.value; drawLights(); }
+    else if (t.dataset.lkey) {
+      const c = LIGHT_SLIDERS.find((x) => x.key === t.dataset.lkey);
+      state.glass.lights[selLight][c.key] = +t.value;
+      t.parentNode.querySelector("output").textContent = c.show(+t.value);
+    }
     else return;
     pushGlass();
   });
@@ -810,6 +845,9 @@
     const g = state.glass;
     if (e.target.closest("[data-add]")) g.colors.push(EXTRA_COLORS.find((c) => !g.colors.includes(c)) || "#ffffff");
     else if (e.target.closest("[data-rm]")) g.colors.splice(+e.target.closest("[data-rm]").dataset.rm, 1);
+    else if (e.target.closest("[data-ladd]")) { g.lights.push({ x: 0.5, y: 0.4, color: "#ffffff", power: 0.8, size: 0.35, depth: 0.5 }); selLight = g.lights.length - 1; }
+    else if (e.target.closest("[data-lrm]")) g.lights.splice(+e.target.closest("[data-lrm]").dataset.lrm, 1);
+    else if (e.target.closest("#lightList .lab-color")) { selLight = [...$("lightList").querySelectorAll(".lab-color")].indexOf(e.target.closest(".lab-color")); drawLights(); return; }
     else if (e.target.closest("#labReset")) state.glass = copyGlass(GLASS_DEFAULTS);
     else if (e.target.closest("#labClose")) { closeLab(); return; }
     else return;

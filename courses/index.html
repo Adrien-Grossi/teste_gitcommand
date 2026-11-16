@@ -151,14 +151,11 @@
     <div id="labBg"></div>
     <h3>Verre des cartes</h3>
     <div id="labGlass"></div>
-    <h3>Lumière</h3>
-    <p class="small">Glisse le point autour de la carte ; règle ensuite s'il est devant ou derrière elle.</p>
+    <h3>Lumières du fond</h3>
+    <p class="small">Des sources lumineuses posées dans le fond : on les voit briller, et leur lumière traverse le verre. Touche une lumière pour la choisir, glisse-la sur l'écran.</p>
     <div class="lightrow">
-      <div class="lightpad" id="lightPad" role="slider" aria-label="Position de la lumière autour de la carte" tabindex="0">
-        <span class="lightpad-card" aria-hidden="true"></span>
-        <span class="lightdot" id="lightDot" aria-hidden="true"></span>
-      </div>
-      <label class="lightcolor">Couleur<input type="color" id="labLightColor" aria-label="Couleur de la lumière"></label>
+      <div class="lightpad" id="lightPad" role="group" aria-label="Position des lumières sur l'écran"></div>
+      <div class="lab-colors lightlist" id="lightList"></div>
     </div>
     <div id="labLight"></div>
     <button class="btn ghost" id="labReset" type="button">Revenir aux réglages d'origine</button>
