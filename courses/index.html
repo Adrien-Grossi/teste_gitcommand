@@ -232,11 +232,7 @@ input, select, textarea {
 .nav { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 8px; margin-top: auto; }
 .btn:disabled { opacity: .35; cursor: default; }
 .btn.go { background: var(--ok); border-color: var(--ok); color: var(--bg); }
-.btn.go.auto {
-  background-image: linear-gradient(var(--hl), var(--hl)); background-repeat: no-repeat;
-  background-size: 0 100%; animation: fill 1.6s linear forwards; color: var(--hl-ink);
-}
-@keyframes fill { to { background-size: 100% 100%; } }
+.btn.go.ready { background: var(--hl); border-color: var(--hl); color: var(--hl-ink); animation: pulse 1.4s ease-out infinite; }
 .datebox { cursor: pointer; }
 
 /* L'écran « Dater le stock » tient toujours dans l'écran : rien ne défile, le pavé prend la place restante. */
@@ -712,19 +708,18 @@ input, select, textarea {
     cancelAuto(); lb.buf = ""; lb.msg = ""; heard = ""; clearTimeout(heardT); $("lbDictate").value = ""; drawDate();
     if (lb.voice) listen();
   }
-  // Date entendue : validation automatique après 1,6 s, sauf si on touche pour corriger.
-  var AUTO_MS = 1600;
+  // Date entendue : elle attend la confirmation (un appui sur Valider, ou dire « oui »),
+  // puis l'article suivant arrive et le micro se relance tout seul.
   function armAuto(iso) {
     cancelAuto();
-    var ok = $("lbOk"); ok.classList.add("auto"); ok.textContent = "Validation…";
-    $("lbPreview").textContent += " · touche la date pour corriger";
-    lb.autoT = setTimeout(function () { lb.autoT = null; setDate(iso); }, AUTO_MS);
+    lb.pending = iso;
+    var ok = $("lbOk"); ok.classList.add("ready"); ok.textContent = "Valider";
+    drawDate();
   }
   function cancelAuto() {
-    if (lb.autoT) { clearTimeout(lb.autoT); lb.autoT = null; }
-    var ok = $("lbOk"); ok.classList.remove("auto"); ok.textContent = "Valider";
+    lb.pending = null;
+    var ok = $("lbOk"); ok.classList.remove("ready"); ok.textContent = "Valider";
   }
-  $("lbDate").addEventListener("click", function () { if (lb.autoT) { cancelAuto(); stopListening(); drawDate(); } });
   function drawDate() {
     var b = lb.buf, slots = b.length > 4 ? 6 : 4, h = "";
     for (var i = 0; i < slots; i++) {
@@ -736,7 +731,8 @@ input, select, textarea {
     $("lbOk").disabled = !iso;
     if (iso) {
       pv.className = "preview ok";
-      pv.textContent = fromISO(iso).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) + " · " + rel(daysLeft(iso));
+      pv.textContent = fromISO(iso).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) + " · " + rel(daysLeft(iso)) +
+        (lb.pending ? " · touche Valider ou dis « oui »" : "");
     } else if (lb.msg) { pv.className = "preview err"; pv.textContent = lb.msg; }
     else if (b.length === 4 || b.length === 6) { pv.className = "preview err"; pv.textContent = "Cette date n'existe pas. Corrige avec ⌫."; }
     else { pv.className = "preview"; pv.textContent = "Jour puis mois : 2606 pour le 26 juin"; }
@@ -746,6 +742,7 @@ input, select, textarea {
     var id = lb.queue[lb.pos];
     state.dates[id] = iso; if (iso !== "none") lb.saved++;
     save(); try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
+    if (SR && !DC) { lb.voice = true; lb.misses = 0; } // on enchaîne : le micro repart pour l'article suivant
     lb.pos++; showItem();
   }
   function press(k) {
@@ -800,7 +797,8 @@ input, select, textarea {
   }
   function voiceCommand(said) {
     var t = norm(said);
-    if (lb.autoT && /\b(non|corrige|attends|attend)\b/.test(t)) { cancelAuto(); lb.buf = ""; lb.msg = ""; drawDate(); return true; }
+    if (lb.pending && /\b(oui|ok|okay|valide|valider|c'est bon|d'accord|parfait)\b/.test(t)) { setDate(lb.pending); return true; }
+    if (lb.pending && /\b(non|corrige|attends|attend)\b/.test(t)) { cancelAuto(); lb.buf = ""; lb.msg = ""; drawDate(); return true; }
     if (/(pas|sans|aucune) (de )?date|pas besoin|ne perime pas/.test(t)) { setDate("none"); return true; }
     if (/\b(passe|passer|suivant)\b/.test(t)) { skipItem(); return true; }
     if (/\b(retour|precedent)\b/.test(t)) { prevItem(); return true; }
@@ -843,7 +841,8 @@ input, select, textarea {
       var alts = ev.results[0], list = [];
       lb.misses = 0;
       for (var i = 0; i < alts.length; i++) list.push(alts[i].transcript);
-      if (!handleHeard(list, true)) lb.relisten = true;
+      // On réécoute aussi après une date, pour entendre « oui », « non » ou une autre date.
+      if (!handleHeard(list, true) || lb.pending) lb.relisten = true;
     };
     r.onerror = function (ev) {
       if (rec !== r) return;
@@ -891,7 +890,7 @@ input, select, textarea {
         $("lbMicText").textContent = dcOn ? "J'écoute… dis la date" : "Dire la date";
       });
       d.onPartial(function (x) {
-        if (sheet.hidden || lb.autoT || !x.text) return;
+        if (sheet.hidden || lb.pending || !x.text) return;
         var pv = $("lbPreview"); pv.className = "preview"; pv.textContent = "« " + (heard + " " + x.text).trim() + " »";
       });
       d.onFinal(function (x) {
