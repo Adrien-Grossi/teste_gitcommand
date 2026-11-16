@@ -405,7 +405,9 @@ body.lab-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
   background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
   border-radius: 999px;   /* forme de galet, la même que le verre dessiné dessous */
 }
-:root.gl-glass[data-skin="verre"] .rows:not(.picker *):not(.lab-body *) { border-radius: var(--group-r); }
+/* La plaque d'un rayon : coins arrondis, pas un galet. « .rows.rows » pour battre la règle de galet
+   ci-dessus : sinon le conteneur, qui coupe son contenu, devient une gélule géante et rogne le haut de la liste. */
+:root.gl-glass[data-skin="verre"] .rows.rows:not(.picker *):not(.lab-body *) { border-radius: var(--group-r); }
 :root.gl-glass[data-skin="verre"] .card.card:not(.picker *):not(.lab-body *) { border-radius: 24px; }   /* cartes d'information : coins moins ronds, plus de place pour le texte */   /* la plaque d'un rayon : coins arrondis, pas un galet */
 :root.gl-glass[data-skin="verre"] :is(.rows, .card, .pill:not(.accent), .iconbtn, .skin, .pad button, .datebox, .mic:not(.on), .btn.ghost):not(.picker *):not(.lab-body *)::after { content: none; }
 :root.gl-glass[data-skin="verre"] .pad button:active { background: rgba(255,255,255,.18); }
@@ -433,7 +435,7 @@ body.lab-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
 [data-skin="verre"] .count b { background: rgba(255,255,255,.16); color: #fff; box-shadow: inset 1px 1px 0 rgba(255,255,255,.6), inset -1px -1px 0 rgba(255,255,255,.2); }
 
 /* Listes : une seule plaque par rayon, comme dans Carnet, avec un fin trait entre les lignes */
-[data-skin="verre"] .rows { --group-r: 28px; border: 0; border-radius: var(--group-r); overflow: hidden; display: block; }
+[data-skin="verre"] .rows { --group-r: 34px; border: 0; border-radius: var(--group-r); overflow: hidden; display: block; }
 [data-skin="verre"] .rows li { border-radius: 0; border-top: 1px solid rgba(255,255,255,.16); padding-inline: 8px; }   /* le contenu reste en retrait du bord, qui est la zone la plus claire du verre */
 [data-skin="verre"] .rows li:first-child { border-top: 0; }
 [data-skin="verre"] .tap { padding-block: 12px; }
