@@ -113,6 +113,26 @@
   </button>
 </nav>
 
+<!-- Modifier un article (appui long) -->
+<div class="picker" id="editor" hidden>
+  <button class="scrim" type="button" data-close-editor aria-label="Fermer"></button>
+  <form class="picker-panel" id="editForm" role="dialog" aria-modal="true" aria-labelledby="edTitle" autocomplete="off">
+    <h2 id="edTitle">Modifier l'article</h2>
+    <label class="field">Nom<input id="edName" required maxlength="60"></label>
+    <div class="field-row">
+      <label class="field">Quantité<input id="edQty" placeholder="ex. ×2, 1 kg" maxlength="24"></label>
+      <label class="field">Rayon<select id="edAisle"></select></label>
+    </div>
+    <label class="field">Note<input id="edNote" placeholder="ex. le plus doux" maxlength="60"></label>
+    <button class="btn" type="submit">Enregistrer</button>
+    <div class="ed-links">
+      <button class="pill" type="button" id="edReset" hidden>Remettre comme à l'origine</button>
+      <button class="pill" type="button" id="edDelete" hidden>Supprimer l'article</button>
+      <button class="pill" type="button" data-close-editor>Annuler</button>
+    </div>
+  </form>
+</div>
+
 <!-- Choix du style -->
 <div class="picker" id="picker" hidden>
   <button class="scrim" type="button" data-close-picker aria-label="Fermer"></button>

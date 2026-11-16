@@ -9,6 +9,8 @@ Trois onglets, un par moment :
 - **Ranger** : ce qui est acheté sans date. On dicte la date de chaque article, on valide.
 - **Chez moi** : le stock, du plus urgent au moins urgent. « Fini » ou « Jeté » le remet dans les courses.
 
+**Appui long sur un article** (dans les trois onglets) : modifier son nom, sa quantité, sa note ou son rayon. « Remettre comme à l'origine » annule la modification ; un article ajouté à la main peut aussi être supprimé. Sur ordinateur : clic droit.
+
 ## Fichiers
 
 | Fichier | Rôle |

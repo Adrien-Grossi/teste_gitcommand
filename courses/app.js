@@ -71,7 +71,7 @@
     ]
   };
   const copyGlass = (g) => ({ ...g, colors: g.colors.slice(), lights: g.lights.map((l) => ({ ...l })) });
-  const state = { marks: {}, dates: {}, custom: [], tab: "courses", skin: "carnet", glass: copyGlass(GLASS_DEFAULTS), v: 3 };
+  const state = { marks: {}, dates: {}, custom: [], edits: {}, tab: "courses", skin: "carnet", glass: copyGlass(GLASS_DEFAULTS), v: 3 };
 
   function load() {
     let saved = null;
@@ -84,6 +84,7 @@
     const out = {
       marks: isObj(d.marks) ? d.marks : {}, dates: isObj(d.dates) ? d.dates : {},
       custom: Array.isArray(d.custom) ? d.custom : [],
+      edits: normalizeEdits(d.edits),
       tab: /^(courses|ranger|frigo)$/.test(d.tab) ? d.tab : "courses",
       skin: SKINS[d.skin] ? d.skin : "carnet", glass: normalizeGlass(d.glass), v: 3
     };
@@ -92,6 +93,19 @@
     return out;
   }
   function isObj(x) { return x && typeof x === "object" && !Array.isArray(x); }
+  // Modifications faites par appui long : id de l'article → { name, qty, note, aisle }. L'identifiant ne
+  // change jamais, donc les coches et les dates de l'article sont conservées.
+  function normalizeEdits(e) {
+    const out = {};
+    if (!isObj(e)) return out;
+    for (const id of Object.keys(e)) {
+      const v = e[id];
+      if (!isObj(v) || typeof v.name !== "string" || !v.name.trim()) continue;
+      out[id] = { name: v.name.trim().slice(0, 60), qty: String(v.qty == null ? "" : v.qty).trim().slice(0, 24),
+        note: String(v.note == null ? "" : v.note).trim().slice(0, 60), aisle: AISLES.some((a) => a.id === v.aisle) ? v.aisle : "" };
+    }
+    return out;
+  }
   // Réglages du verre : chaque valeur est bornée ; ce qui manque reprend la valeur d'origine.
   function normalizeGlass(g) {
     const out = copyGlass(GLASS_DEFAULTS);
@@ -134,13 +148,22 @@
   // Catalogue complet : articles de base + ajouts (un ajout du même nom qu'un article de base est ignoré).
   const BASE_NAMES = new Set(AISLES.flatMap((a) => a.items.map((it) => slug(it[0]))));
   function catalogue() {
-    return AISLES.map((a) => {
-      const items = a.items.map(([name, qty = "", note = ""]) => ({ id: a.id + ":" + slug(name), name, qty, note, aisle: a.name }));
-      for (const c of state.custom) {
-        if (c.aisle === a.id && !BASE_NAMES.has(slug(c.name))) items.push({ id: c.id, name: c.name, qty: "", note: "ajouté", aisle: a.name, custom: true });
-      }
-      return { id: a.id, name: a.name, hint: a.hint, items };
-    });
+    const out = AISLES.map((a) => ({ id: a.id, name: a.name, hint: a.hint, items: [] }));
+    const byId = Object.fromEntries(out.map((a) => [a.id, a]));
+    // Place un article dans son rayon, en appliquant ses modifications éventuelles.
+    const place = (it, home) => {
+      const e = state.edits[it.id], aisle = e && byId[e.aisle] ? e.aisle : home;
+      byId[aisle].items.push({ ...it, ...(e ? { name: e.name, qty: e.qty, note: e.note } : {}), aisle: byId[aisle].name, aisleId: aisle, edited: !!e });
+    };
+    for (const a of AISLES) for (const [name, qty = "", note = ""] of a.items) place({ id: a.id + ":" + slug(name), name, qty, note }, a.id);
+    for (const c of state.custom) if (byId[c.aisle] && !BASE_NAMES.has(slug(c.name))) place({ id: c.id, name: c.name, qty: "", note: "ajouté", custom: true }, c.aisle);
+    return out;
+  }
+  // Valeurs d'origine d'un article (avant toute modification), pour savoir s'il a changé.
+  function originalOf(id) {
+    for (const a of AISLES) for (const [name, qty = "", note = ""] of a.items) if (a.id + ":" + slug(name) === id) return { name, qty, note, aisle: a.id };
+    const c = state.custom.find((x) => x.id === id);
+    return c ? { name: c.name, qty: "", note: "ajouté", aisle: c.aisle } : null;
   }
   const allItems = () => catalogue().flatMap((a) => a.items);
   const itemById = (id) => allItems().find((it) => it.id === id);
@@ -222,7 +245,7 @@
     $("count").innerHTML = n ? "<b>" + n + "</b>" : "";
     const sub = $("viewSub");
     if (state.tab === "courses") {
-      sub.innerHTML = shop.here ? "Rayon en cours : <strong>" + esc(shop.here) + "</strong> · touche ce qui va dans le caddie" : "Liste terminée";
+      sub.innerHTML = shop.here ? "Rayon en cours : <strong>" + esc(shop.here) + "</strong> · appui long pour modifier" : "Liste terminée";
     } else if (state.tab === "ranger") {
       sub.textContent = range.n ? "En rangeant, dis la date de chaque article." : "Tout est rangé et daté.";
     } else {
@@ -341,10 +364,10 @@
     wakeScreen();
     if (act === "del") {
       const i = state.custom.findIndex((c) => c.id === id);
-      const removed = state.custom.splice(i, 1)[0];
-      delete state.marks[id]; delete state.dates[id];
+      const removed = state.custom.splice(i, 1)[0], edit = state.edits[id];
+      delete state.marks[id]; delete state.dates[id]; delete state.edits[id];
       save(); render();
-      toast("Supprimé : " + removed.name, () => { state.custom.splice(i, 0, removed); restore(id, before); });
+      toast("Supprimé : " + removed.name, () => { state.custom.splice(i, 0, removed); restore(id, before); if (edit) state.edits[id] = edit; });
       return;
     }
     if (act === "got") {
@@ -410,6 +433,85 @@
     delete state.marks[id]; delete state.dates[id];
     save(); render();
     toast(itemById(id).name + " · remis dans les courses", () => restore(id, before));
+  });
+
+  /* 6 bis. Appui long : modifier un article (nom, quantité, rayon, note) -------------------------- */
+  let pressTimer = 0, pressShow = 0, pressFired = false, pressStart = null, pressLi = null, suppressClickUntil = 0;
+  const holdOff = () => {
+    clearTimeout(pressTimer); clearTimeout(pressShow); pressTimer = pressShow = 0;
+    if (pressLi) { pressLi.classList.remove("pressing"); pressLi = null; }
+  };
+  for (const listId of ["shopList", "rangeList", "stockList"]) {
+    const list = $(listId);
+    list.addEventListener("pointerdown", (e) => {
+      const tap = e.target.closest(".tap");
+      if (!tap || (e.pointerType === "mouse" && e.button !== 0)) return;
+      holdOff();
+      pressLi = tap.closest("li"); pressStart = { x: e.clientX, y: e.clientY };
+      const id = pressLi.dataset.id, li = pressLi;
+      pressShow = setTimeout(() => li.classList.add("pressing"), 150);          // retour visuel dès qu'on s'attarde
+      pressTimer = setTimeout(() => {                                            // ~½ s : on ouvre l'éditeur
+        pressTimer = 0; pressFired = true; li.classList.remove("pressing"); vibrate(25); openEditor(id);
+      }, 520);
+    });
+    list.addEventListener("pointermove", (e) => {
+      if (pressTimer && Math.hypot(e.clientX - pressStart.x, e.clientY - pressStart.y) > 10) holdOff();   // on fait défiler : ce n'est pas un appui long
+    });
+    // Après un appui long, le relâchement ne doit pas compter comme un appui (sinon l'article serait coché).
+    list.addEventListener("click", (e) => {
+      if (Date.now() < suppressClickUntil) { e.stopImmediatePropagation(); e.preventDefault(); }
+    }, true);
+    list.addEventListener("contextmenu", (e) => {   // clic droit sur ordinateur ; sur téléphone, le menu du navigateur est supprimé
+      const tap = e.target.closest(".tap"); if (!tap) return;
+      e.preventDefault();
+      if ($("editor").hidden && !pressFired) openEditor(tap.closest("li").dataset.id);
+    });
+  }
+  const endPress = () => {
+    holdOff();
+    if (pressFired) { suppressClickUntil = Date.now() + 450; pressFired = false; }
+  };
+  document.addEventListener("pointerup", endPress, true);
+  document.addEventListener("pointercancel", endPress, true);
+
+  let editingId = null, editorOpenedAt = 0;
+  $("edAisle").innerHTML = AISLES.map((a) => '<option value="' + a.id + '">' + esc(a.name) + "</option>").join("");
+  function openEditor(id) {
+    const it = itemById(id); if (!it) return;
+    editingId = id; editorOpenedAt = Date.now();
+    $("edTitle").textContent = "Modifier l'article";
+    $("edName").value = it.name; $("edQty").value = it.qty; $("edNote").value = it.note; $("edAisle").value = it.aisleId;
+    $("edReset").hidden = !state.edits[id]; $("edDelete").hidden = !it.custom;
+    $("editor").hidden = false;
+    setTimeout(() => { try { $("edName").focus(); $("edName").select(); } catch (e) {} }, 60);
+  }
+  function closeEditor() { $("editor").hidden = true; editingId = null; }
+  $("editor").addEventListener("click", (e) => {
+    if (e.target.closest("[data-close-editor]") && Date.now() - editorOpenedAt > 350) closeEditor();   // ignore le relâchement qui suit l'appui long
+  });
+  $("editForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const id = editingId, o = id && originalOf(id); if (!o) { closeEditor(); return; }
+    const name = $("edName").value.trim();
+    if (!name) { $("edName").focus(); return; }
+    const next = { name, qty: $("edQty").value.trim(), note: $("edNote").value.trim(), aisle: $("edAisle").value };
+    const before = state.edits[id];
+    if (next.name === o.name && next.qty === o.qty && next.note === o.note && next.aisle === o.aisle) delete state.edits[id];
+    else state.edits[id] = next;
+    save(); render(); closeEditor();
+    toast("Modifié : " + name, () => { if (before) state.edits[id] = before; else delete state.edits[id]; });
+  });
+  $("edReset").addEventListener("click", () => {
+    const id = editingId, before = state.edits[id], name = (originalOf(id) || {}).name || "";
+    delete state.edits[id]; save(); render(); closeEditor();
+    toast("Remis comme à l'origine : " + name, () => { if (before) state.edits[id] = before; });
+  });
+  $("edDelete").addEventListener("click", () => {
+    const id = editingId, i = state.custom.findIndex((c) => c.id === id); if (i < 0) return;
+    const removed = state.custom.splice(i, 1)[0], before = { mark: state.marks[id], date: state.dates[id], edit: state.edits[id] };
+    delete state.marks[id]; delete state.dates[id]; delete state.edits[id];
+    save(); render(); closeEditor();
+    toast("Supprimé : " + removed.name, () => { state.custom.splice(i, 0, removed); restore(id, before); if (before.edit) state.edits[id] = before.edit; });
   });
 
   /* 7. Message « Annuler » ------------------------------------------------------------------- */

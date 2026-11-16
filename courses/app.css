@@ -206,6 +206,16 @@ textarea { resize: vertical; font-size: .85rem; word-break: break-all; }
   outline: 3px solid var(--hl); outline-offset: -3px;
 }
 
+/* Appui long : retour visuel pendant l'appui, et pas de sélection de texte ni de menu du navigateur */
+.tap { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.rows li .label { transition: opacity .15s, transform .15s; }
+.rows li.pressing .label { opacity: .5; transform: scale(.98); }
+/* Fenêtre de modification d'un article */
+.field { display: grid; gap: 4px; font-size: .9rem; color: var(--muted); }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field-row .field { min-width: 0; }
+.ed-links { display: flex; flex-wrap: wrap; gap: 8px; }
+
 /* 5. Onglet « Chez moi » ------------------------------------------------- */
 .when { flex: none; display: grid; justify-items: end; line-height: 1.2; font-size: .75rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .when b { font-family: var(--font-display); font-size: 1.15rem; color: var(--ink); }
