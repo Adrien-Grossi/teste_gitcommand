@@ -416,7 +416,7 @@
       // Arrondi réglable, jusqu'au galet ; plafonné à 34 px pour qu'une plaque haute (un rayon entier)
       // garde des coins de carte et ne devienne pas un galet géant.
       "    vec2 hs = cards[j].zw * 0.5; float rj = min(min(mix(min(6.0, min(hs.x, hs.y)), min(hs.x, hs.y), gRound), 34.0), crad[j]);",
-      "    if (rr(pc - cards[j].xy - hs, hs, rj) < 1.0){ b = cards[j]; rad = rj; hit = true; }",
+      "    if (rr(pc - cards[j].xy - hs, hs, rj) < 2.0){ b = cards[j]; rad = rj; hit = true; }",
       "  }",
       "  if (!hit){ gl_FragColor = vec4(base, 1.0); return; }",
       "  vec2 hs = b.zw * 0.5, lp = pc - b.xy - hs;",
@@ -502,7 +502,7 @@
       "    col = 1.0 - (1.0 - col) * (1.0 - clamp(lCol[j].rgb * lCol[j].a * line * opp * near * 1.8 * gCounter, 0.0, 1.0));",
       "  }",
       "  col += col * exp(-inside / 0.9) * 0.3 * gLight;",
-      "  gl_FragColor = vec4(mix(base, col, 1.0 - smoothstep(-0.8, 0.6, sd)), 1.0);",   // bord lissé
+      "  gl_FragColor = vec4(mix(base, col, 1.0 - smoothstep(-0.7 / px, 0.7 / px, sd)), 1.0);",   // bord lissé sur ~1,4 pixel réel
       "}"
     ].join("\n"),
     // Le contexte graphique est créé une seule fois ; ensuite on met simplement en pause ou on reprend.
@@ -539,7 +539,7 @@
         "gZoom", "gBezel", "gDisp", "gFrost", "gLight", "gRound", "gThick", "gReflect", "gCounter", "gCw", "gRough", "lPos", "lCol", "nlight"]) this.u[name] = gl.getUniformLocation(prog, name);
       Object.assign(this, { canvas, gl });
       this.onResize = () => {
-        const k = 0.85;  // un peu sous la résolution de l'écran : les bords du verre restent nets, le téléphone respire
+        const k = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);  // pleine résolution (2× max) : les bords arrondis restent nets
         canvas.width = Math.max(1, Math.round(innerWidth * k)); canvas.height = Math.max(1, Math.round(innerHeight * k));
         gl.viewport(0, 0, canvas.width, canvas.height);
         this.prevBoxes = "";
