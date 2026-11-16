@@ -1,592 +1,35 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-skin="carnet">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
-<link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0e0e10">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-192.png">
 <title>Mes courses</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#0e0e10">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Outfit:wght@500;700;800&family=Kalam:wght@700&family=VT323&family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&family=Sora:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
-<style>
-/* Layout : une seule colonne façon carnet, en-tête collant avec le compteur, rayons dans l'ordre du magasin. */
-:root {
-  --bg: #f6f5f0;
-  --card: #ffffff;
-  --ink: #1b1b1f;
-  --muted: #6b6a73;
-  --line: #e2e0d8;
-  --hl: #ffe14d;          /* le surligneur jaune du carnet */
-  --hl-ink: #1b1b1f;
-  --ok: #1f8a4c;
-  --ok-soft: #dff3e6;
-  --skip: #9a98a2;
-  --bad: #c2372b;
-  --warn: #a35c00;
-  --font-display: "Bricolage Grotesque", "Atkinson Hyperlegible", system-ui, sans-serif;
-  --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --radius: 14px;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0e0e10; --card: #18181c; --ink: #f2f1ec; --muted: #9c9aa5; --line: #2a2a30;
-    --hl: #ffd92e; --hl-ink: #121214; --ok: #4fd18a; --ok-soft: #173826; --skip: #6c6a74; --bad: #ff6b5e; --warn: #ffb347;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #0e0e10; --card: #18181c; --ink: #f2f1ec; --muted: #9c9aa5; --line: #2a2a30;
-  --hl: #ffd92e; --hl-ink: #121214; --ok: #4fd18a; --ok-soft: #173826; --skip: #6c6a74; --bad: #ff6b5e; --warn: #ffb347;
-  color-scheme: dark;
-}
-
-* { box-sizing: border-box; }
-body {
-  background: var(--bg); color: var(--ink);
-  font-family: var(--font-body); font-size: 18px; line-height: 1.35;
-  -webkit-tap-highlight-color: transparent;
-}
-body::before {
-  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
-  z-index: 10; background: var(--bg);
-}
-.wrap {
-  max-width: 560px; margin: 0 auto;
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 0 120px;
-}
-
-/* En-tête collant */
-header {
-  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
-  background: var(--bg); padding-block: 14px 12px;
-  border-bottom: 1px solid var(--line);
-}
-.top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-h1 { font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; margin: 0; letter-spacing: -0.01em; }
-.left { font-family: var(--font-display); font-weight: 800; font-size: 1.05rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.left b { background: var(--hl); color: var(--hl-ink); padding: 0 8px; border-radius: 6px; }
-.bar { height: 10px; background: var(--line); border-radius: 99px; margin-top: 10px; overflow: hidden; }
-.bar i { display: block; height: 100%; width: 0; background: var(--ok); border-radius: 99px; transition: width .3s ease; }
-.next { margin-top: 10px; font-size: .95rem; color: var(--muted); display: flex; gap: 8px; align-items: center; min-height: 1.4em; }
-.next strong { color: var(--ink); }
-.toggles { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-.pill {
-  font: inherit; font-size: .9rem; border: 1.5px solid var(--line); background: var(--card); color: var(--ink);
-  border-radius: 99px; padding: 8px 14px; cursor: pointer; min-height: 40px;
-}
-.pill[aria-pressed="true"] { border-color: var(--ink); }
-
-/* Rayons */
-section { margin-top: 22px; }
-.aisle-h {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  margin: 0 0 8px; padding: 0 4px;
-}
-.aisle-h h2 {
-  font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; margin: 0;
-  display: flex; align-items: center; gap: 10px;
-}
-.aisle-h .n { font-size: .9rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-section.current .aisle-h h2::after {
-  content: "ICI"; font-family: var(--font-body); font-size: .7rem; letter-spacing: .1em; font-weight: 700;
-  background: var(--hl); color: var(--hl-ink); padding: 3px 7px; border-radius: 5px;
-}
-section.done .aisle-h { opacity: .55; }
-section.done .aisle-h h2::before { content: "✓"; color: var(--ok); }
-section.done.hidedone ul { display: none; }
-.hint { font-size: .85rem; color: var(--muted); margin: -4px 4px 8px; }
-
-ul { list-style: none; margin: 0; padding: 0; background: var(--card); border-radius: var(--radius); border: 1px solid var(--line); overflow: hidden; }
-li { display: flex; align-items: stretch; border-top: 1px solid var(--line); }
-li:first-child { border-top: 0; }
-.tap {
-  flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px;
-  font: inherit; color: inherit; text-align: left; background: none; border: 0; cursor: pointer;
-  padding: 14px 12px 14px 14px; min-height: 60px;
-}
-.box {
-  flex: none; width: 30px; height: 30px; border-radius: 8px; border: 2.5px solid var(--muted);
-  display: grid; place-items: center; transition: background .15s, border-color .15s;
-}
-.box svg { width: 20px; height: 20px; opacity: 0; transform: scale(.5); transition: .15s; }
-.label { min-width: 0; }
-.name { font-size: 1.1rem; overflow-wrap: anywhere; }
-.qty {
-  display: inline-block; margin-left: 6px; font-size: .85rem; font-weight: 700;
-  background: var(--hl); color: var(--hl-ink); padding: 1px 7px; border-radius: 6px; white-space: nowrap; vertical-align: 2px;
-}
-.note { display: block; font-size: .85rem; color: var(--muted); }
-.side {
-  flex: none; width: 56px; font: inherit; font-size: .7rem; color: var(--muted); background: none;
-  border: 0; border-left: 1px solid var(--line); cursor: pointer; display: grid; place-items: center; gap: 2px; padding: 4px;
-  text-transform: uppercase; letter-spacing: .04em; line-height: 1.1;
-}
-.side svg { width: 18px; height: 18px; }
-
-li.got .box { background: var(--ok); border-color: var(--ok); }
-li.got .box svg { opacity: 1; transform: scale(1); color: #fff; }
-li.got .name { text-decoration: line-through; color: var(--muted); }
-li.got .qty, li.skip .qty { background: var(--line); color: var(--muted); }
-li.got { background: var(--ok-soft); }
-li.skip .name { text-decoration: line-through; color: var(--skip); }
-li.skip .box { border-style: dashed; border-color: var(--skip); }
-li.skip .side { color: var(--ink); }
-li.leaving { animation: out .45s ease forwards; }
-@keyframes out { 60% { opacity: 1; } 100% { opacity: 0; transform: translateX(24px); } }
-
-.tap:focus-visible, .side:focus-visible, .pill:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
-  outline: 3px solid var(--hl); outline-offset: -3px;
-}
-
-/* Fin de liste */
-.allset {
-  margin-top: 28px; text-align: center; padding: 28px 16px; border-radius: var(--radius);
-  background: var(--ok-soft); border: 1px solid var(--line);
-}
-.allset h2 { font-family: var(--font-display); font-size: 1.6rem; margin: 0 0 6px; }
-.tools { margin-top: 32px; display: grid; gap: 14px; }
-.tools h3 { font-family: var(--font-display); font-size: 1rem; margin: 0; }
-form { display: grid; grid-template-columns: 1fr; gap: 8px; }
-textarea { resize: vertical; font-size: .85rem !important; word-break: break-all; }
-input, select, textarea {
-  font: inherit; font-size: 1rem; width: 100%; min-height: 50px; padding: 10px 12px;
-  border-radius: 12px; border: 1.5px solid var(--line); background: var(--card); color: var(--ink);
-}
-.btn {
-  font: inherit; font-weight: 700; min-height: 52px; border-radius: 12px; cursor: pointer;
-  border: 1.5px solid var(--ink); background: var(--ink); color: var(--bg); padding: 10px 16px;
-}
-.btn.ghost { background: transparent; color: var(--ink); }
-.btn.warn { background: #c2372b; border-color: #c2372b; color: #fff; }
-.small { font-size: .85rem; color: var(--muted); margin: 0; }
-
-/* Toast annuler */
-.toast {
-  position: fixed; left: 50%; transform: translateX(-50%);
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  width: min(520px, calc(100% - 32px)); z-index: 20;
-  background: var(--ink); color: var(--bg); border-radius: 14px; padding: 8px 8px 8px 16px;
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  box-shadow: 0 8px 30px rgba(0,0,0,.25); font-size: 1rem;
-}
-.toast span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.toast button { font: inherit; font-weight: 700; background: var(--hl); color: var(--hl-ink); border: 0; border-radius: 10px; padding: 10px 14px; min-height: 44px; cursor: pointer; white-space: nowrap; }
-
-/* Dates de péremption */
-.pill.accent { background: var(--hl); color: var(--hl-ink); border-color: var(--hl); font-weight: 700; }
-.dlc { display: block; font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.dlc.warn { color: var(--warn); font-weight: 700; }
-.dlc.bad { color: var(--bad); font-weight: 700; }
-.tag-exp {
-  display: inline-block; margin-top: 4px; font-size: .8rem; font-weight: 700; line-height: 1.25;
-  background: var(--bad); color: var(--bg); padding: 3px 8px; border-radius: 6px;
-}
-#urgent { margin-top: 22px; }
-#urgent .side { color: var(--ok); }
-
-.sheet {
-  position: fixed; inset: 0; z-index: 30; background: var(--bg); overflow-y: auto;
-  padding-top: calc(12px + env(safe-area-inset-top, 0px));
-  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-  padding-left: max(16px, env(safe-area-inset-left, 0px));
-  padding-right: max(16px, env(safe-area-inset-right, 0px));
-}
-.sheet-in { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
-.sheet-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.count { font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
-.item-name { font-family: var(--font-display); font-size: 1.9rem; font-weight: 800; margin: 0; line-height: 1.1; text-wrap: balance; overflow-wrap: anywhere; }
-.item-sub { color: var(--muted); font-size: .95rem; margin: 0; min-height: 1.3em; }
-.datebox {
-  font-family: var(--font-display); font-size: 2.6rem; font-weight: 800; text-align: center;
-  background: var(--card); border: 2px solid var(--line); border-radius: var(--radius);
-  padding: 8px; font-variant-numeric: tabular-nums; letter-spacing: .04em;
-}
-.datebox.ok { border-color: var(--ok); }
-.datebox .ph { color: var(--line); }
-.datebox .sep { color: var(--muted); padding: 0 2px; }
-.preview { text-align: center; margin: 0; min-height: 1.4em; color: var(--muted); }
-.preview.ok { color: var(--ok); font-weight: 700; }
-.preview.err { color: var(--bad); font-weight: 700; }
-.mic {
-  display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px;
-  font: inherit; font-weight: 700; font-size: 1.05rem; border-radius: 12px; cursor: pointer;
-  border: 2px solid var(--ink); background: var(--card); color: var(--ink);
-}
-.mic svg { width: 22px; height: 22px; }
-.mic.on { background: var(--hl); color: var(--hl-ink); border-color: var(--hl); animation: pulse 1.2s ease-out infinite; }
-@keyframes pulse { 0% { box-shadow: 0 0 0 0 var(--hl); } 100% { box-shadow: 0 0 0 12px transparent; } }
-.pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.pad button {
-  font: inherit; font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; min-height: 56px;
-  border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--ink); cursor: pointer;
-}
-.pad button:active { background: var(--line); }
-.pad button.fn { font-family: var(--font-body); font-size: 1rem; color: var(--muted); }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.nav { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 8px; margin-top: auto; }
-.btn:disabled { opacity: .35; cursor: default; }
-.btn.go { background: var(--ok); border-color: var(--ok); color: var(--bg); }
-.btn.go.ready { background: var(--hl); border-color: var(--hl); color: var(--hl-ink); animation: pulse 1.4s ease-out infinite; }
-.datebox { cursor: pointer; }
-
-/* L'écran « Dater le stock » tient toujours dans l'écran : rien ne défile, le pavé prend la place restante. */
-.sheet { overflow: hidden; overscroll-behavior: contain; touch-action: manipulation; }
-.sheet-in { height: 100%; min-height: 0; gap: 8px; }
-.sheet-in > * { flex: none; }
-.item-name { font-size: clamp(1.3rem, 6.5vw, 1.9rem); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.item-sub { font-size: .85rem; min-height: 0; }
-#lbCurrent:empty { display: none; }
-.datebox { font-size: clamp(1.8rem, 9vw, 2.4rem); padding: 4px 8px; }
-.preview { font-size: .9rem; line-height: 1.3; min-height: 2.6em; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.mic { min-height: 50px; }
-.sheet-in > .pad { flex: 1 1 auto; min-height: 0; grid-template-rows: repeat(4, minmax(0, 1fr)); }
-.pad button { min-height: 0; font-size: clamp(1.2rem, 5.5vw, 1.6rem); }
-.chips { flex-wrap: nowrap; gap: 6px; }
-.chips .pill { flex: 1 1 0; min-width: 0; padding: 6px 4px; font-size: .82rem; white-space: nowrap; min-height: 40px; }
-.nav { margin-top: 0; }
-.nav .btn { min-height: 50px; }
-
-/* Trois onglets en bas, à portée de pouce : Courses · Ranger · Chez moi. */
-.wrap { padding-block: 0 calc(96px + env(safe-area-inset-bottom, 0px)); }
-.sub { margin: 6px 0 0; font-size: .95rem; color: var(--muted); min-height: 1.35em; }
-.sub strong { color: var(--ink); }
-.t-bad { color: var(--bad); font-weight: 700; }
-.t-warn { color: var(--warn); font-weight: 700; }
-.view > section:first-child, .view > div:first-child > section:first-child { margin-top: 16px; }
-.tabs {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 15;
-  display: grid; grid-template-columns: repeat(3, 1fr);
-  background: var(--card); border-top: 1px solid var(--line);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px);
-}
-.tabs button {
-  position: relative; font: inherit; font-size: .8rem; font-weight: 700; color: var(--muted);
-  background: none; border: 0; cursor: pointer; min-height: 64px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-}
-.tabs svg { width: 26px; height: 26px; }
-.tabs button[aria-current="page"] { color: var(--ink); }
-.tabs button[aria-current="page"]::before {
-  content: ""; position: absolute; top: 0; left: 22%; right: 22%; height: 3px; border-radius: 0 0 3px 3px; background: var(--ink);
-}
-.badge {
-  position: absolute; top: 6px; left: calc(50% + 8px); min-width: 20px; height: 20px; padding: 0 6px;
-  border-radius: 99px; font-size: .72rem; line-height: 20px; text-align: center;
-  background: var(--ink); color: var(--bg); font-variant-numeric: tabular-nums;
-}
-.badge.hl { background: var(--hl); color: var(--hl-ink); }
-.badge.bad { background: var(--bad); color: var(--bg); }
-.toast { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
-
-.empty {
-  margin-top: 24px; text-align: center; padding: 28px 16px; border-radius: var(--radius);
-  background: var(--card); border: 1px solid var(--line); display: grid; gap: 10px; justify-items: center;
-}
-.empty h2 { font-family: var(--font-display); font-size: 1.4rem; margin: 0; }
-.skipbar {
-  margin-top: 18px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  font-size: .9rem; color: var(--muted); padding: 0 4px;
-}
-details.tools { margin-top: 28px; border-top: 1px solid var(--line); padding-top: 14px; }
-details.tools summary { cursor: pointer; color: var(--muted); font-size: .95rem; padding: 6px 0; }
-.tools-in { display: grid; gap: 12px; margin-top: 12px; }
-.tools-in h3 { font-family: var(--font-display); font-size: 1rem; margin: 8px 0 0; }
-
-.bigcta {
-  margin-top: 16px; width: 100%; min-height: 64px; display: flex; align-items: center; justify-content: center; gap: 12px;
-  font: inherit; font-weight: 800; font-size: 1.15rem; border-radius: var(--radius); cursor: pointer;
-  background: var(--hl); color: var(--hl-ink); border: 0;
-}
-.bigcta svg { width: 26px; height: 26px; }
-#rangerList { margin-top: 14px; }
-.dot { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--hl); }
-
-.group { margin-top: 20px; }
-.aisle-h.g-bad h2 { color: var(--bad); }
-.aisle-h.g-warn h2 { color: var(--warn); }
-.aisle-h.g-muted h2 { color: var(--muted); }
-details.group summary { list-style: none; cursor: pointer; }
-details.group summary::-webkit-details-marker { display: none; }
-details.group summary .aisle-h h2::after { content: "Afficher"; font-family: var(--font-body); font-size: .75rem; font-weight: 700; color: var(--muted); }
-details.group[open] summary .aisle-h h2::after { content: "Masquer"; }
-#frigoList .tap { justify-content: space-between; }
-.when {
-  flex: none; display: grid; justify-items: end; font-size: .75rem; color: var(--muted);
-  font-variant-numeric: tabular-nums; line-height: 1.2;
-}
-.when b { font-family: var(--font-display); font-size: 1.15rem; color: var(--ink); }
-.when.g-bad b { color: var(--bad); }
-.when.g-warn b { color: var(--warn); }
-.when.g-muted b { color: var(--muted); font-size: .95rem; }
-.notifcard {
-  margin-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 12px 14px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--line); font-size: .95rem;
-}
-li.leaving { animation: out .38s ease forwards; }
-
-/* =====================  STYLES AU CHOIX  =====================
-   carnet (défaut) · verre (glassmorphisme) · relief (skeuomorphisme)
-   argile (claymorphisme) · tech (minimalisme high-tech clair)
-   Chaque style assume un seul rendu (clair ou sombre) et redéfinit ses couleurs. */
-
-/* Sélecteur de style */
-.top { align-items: center; }
-.topr { display: flex; align-items: center; gap: 10px; }
-.skinbtn {
-  width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; cursor: pointer;
-  background: var(--card); color: var(--ink); border: 1.5px solid var(--line);
-}
-.skinbtn svg { width: 20px; height: 20px; }
-.skinsheet { position: fixed; inset: 0; z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
-.skinsheet .scrim { position: absolute; inset: 0; background: rgba(0,0,0,.45); border: 0; cursor: pointer; }
-.skinpanel {
-  position: relative; width: min(560px, 100%); max-height: 88%; overflow-y: auto;
-  background: var(--bg); color: var(--ink); border-radius: 22px 22px 0 0;
-  padding: 18px max(16px, env(safe-area-inset-right, 0px)) calc(18px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
-  display: grid; gap: 12px; box-shadow: 0 -10px 40px rgba(0,0,0,.3);
-}
-.skinpanel h2 { font-family: var(--font-display); margin: 0; font-size: 1.3rem; }
-.skinlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-.skinopt {
-  font: inherit; color: inherit; text-align: left; cursor: pointer; padding: 8px; border-radius: 16px;
-  background: var(--card); border: 2px solid var(--line); display: grid; gap: 8px;
-}
-.skinopt[aria-pressed="true"] { border-color: var(--ink); }
-.skinopt b { font-size: 1rem; }
-.skinopt small { color: var(--muted); font-size: .78rem; line-height: 1.25; }
-.sw { height: 74px; border-radius: 10px; position: relative; overflow: hidden; display: grid; place-items: center; }
-.sw i { width: 70%; height: 30px; border-radius: 8px; display: flex; align-items: center; gap: 6px; padding: 0 8px; }
-.sw i::before { content: ""; width: 12px; height: 12px; border-radius: 3px; }
-.sw i::after { content: ""; flex: 1; height: 5px; border-radius: 3px; opacity: .6; }
-.sw-carnet { background: #0e0e10; }
-.sw-carnet i { background: #18181c; border: 1px solid #2a2a30; }
-.sw-carnet i::before { background: #ffd92e; } .sw-carnet i::after { background: #f2f1ec; }
-.sw-verre { background: radial-gradient(60% 60% at 20% 20%, #ff5fa2, transparent), radial-gradient(60% 60% at 90% 80%, #2fe0c8, transparent), linear-gradient(160deg, #2a1660, #0d1b3d); }
-.sw-verre i { background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.4); backdrop-filter: blur(6px); }
-.sw-verre i::before { background: #7cf3e3; } .sw-verre i::after { background: #fff; }
-.sw-relief { background: repeating-linear-gradient(45deg, rgba(0,0,0,.04) 0 2px, transparent 2px 6px), #e6dcc6; }
-.sw-relief i { background: #fffdf6; border: 1px solid #cdbf9f; box-shadow: 0 3px 6px rgba(70,50,20,.3); }
-.sw-relief i::before { background: linear-gradient(#ffe27a, #e9b730); box-shadow: 0 1px 0 #a87d10; } .sw-relief i::after { background: #2b2418; }
-.sw-argile { background: radial-gradient(60% 60% at 10% 10%, #ffd6e8, transparent), #efe7ff; }
-.sw-argile i { background: #fbf8ff; border-radius: 14px; box-shadow: 5px 5px 10px rgba(124,98,190,.3), -4px -4px 8px #fff; }
-.sw-argile i::before { background: #ffb86b; border-radius: 6px; } .sw-argile i::after { background: #3a2e5c; }
-.sw-tech { background: radial-gradient(#d4d8de 1px, transparent 1px) 0 0 / 10px 10px, #f6f7f9; }
-.sw-tech i { background: #fff; border: 1px solid #e1e4e8; border-radius: 4px; }
-.sw-tech i::before { background: #2f6bff; border-radius: 2px; } .sw-tech i::after { background: #0b0d12; height: 3px; }
-
-[data-skin] .sheet { background: inherit; background-attachment: scroll; }
-
-/* ---------- VERRE · glassmorphisme ---------- */
-:root[data-skin="verre"] {
-  --bg: #1a1240; --card: rgba(255,255,255,.10); --ink: #ffffff; --muted: rgba(255,255,255,.7);
-  --line: rgba(255,255,255,.2); --hl: #7cf3e3; --hl-ink: #0b1430; --ok: #7cf3b0; --ok-soft: rgba(124,243,176,.14);
-  --skip: rgba(255,255,255,.5); --bad: #ff8fa0; --warn: #ffd27a; --radius: 22px;
-  --font-display: "Outfit", "Atkinson Hyperlegible", system-ui, sans-serif; color-scheme: dark;
-}
-[data-skin="verre"] body {
-  background:
-    radial-gradient(55% 35% at 10% 8%, rgba(255,95,162,.75), transparent 70%),
-    radial-gradient(50% 35% at 95% 35%, rgba(79,125,255,.75), transparent 70%),
-    radial-gradient(60% 40% at 40% 100%, rgba(47,224,200,.6), transparent 70%),
-    linear-gradient(165deg, #241458, #0d1b3d);
-  background-attachment: fixed;
-}
-[data-skin="verre"] :is(ul, .empty, .notifcard, .pill, .pad button, .datebox, .mic, .btn.ghost, .skinbtn, .skinopt) {
-  background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.24);
-  -webkit-backdrop-filter: blur(18px) saturate(150%); backdrop-filter: blur(18px) saturate(150%);
-  box-shadow: 0 10px 30px rgba(5,0,40,.28), inset 0 1px 0 rgba(255,255,255,.3);
-}
-[data-skin="verre"] header, [data-skin="verre"] .tabs {
-  background: rgba(26,18,64,.4); -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%);
-}
-[data-skin="verre"] body::before { background: rgba(26,18,64,.6); }
-[data-skin="verre"] .tabs { border-top: 1px solid rgba(255,255,255,.18); }
-[data-skin="verre"] .bigcta { background: linear-gradient(120deg, #7cf3e3, #9d8bff 60%, #ff8fc8); color: #0b1430; box-shadow: 0 10px 30px rgba(124,243,227,.35); }
-[data-skin="verre"] .btn { background: rgba(255,255,255,.92); color: #160f3a; border-color: transparent; }
-[data-skin="verre"] .btn.ghost { color: #fff; }
-[data-skin="verre"] .btn.go { background: var(--ok); color: #0b1430; }
-[data-skin="verre"] .btn.go.ready { background: var(--hl); }
-[data-skin="verre"] .toast { background: rgba(255,255,255,.88); color: #160f3a; backdrop-filter: blur(16px); }
-[data-skin="verre"] .badge { background: #fff; color: #160f3a; }
-[data-skin="verre"] li.leaving { background: rgba(124,243,176,.15); }
-[data-skin="verre"] .skinpanel { background: rgba(26,18,64,.75); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
-[data-skin="verre"] .tag-exp { color: #2a0b14; }
-
-/* ---------- RELIEF · skeuomorphisme (papier, cuir, minuteur LCD) ---------- */
-:root[data-skin="relief"] {
-  --bg: #e6dcc6; --card: #fffdf6; --ink: #2b2418; --muted: #786b55; --line: #d8cbb0;
-  --hl: #f2c94c; --hl-ink: #2b2418; --ok: #3f8f3a; --ok-soft: #e6f0d8; --skip: #a89a80;
-  --bad: #b4372a; --warn: #9c5a12; --radius: 10px;
-  --font-display: "Kalam", "Atkinson Hyperlegible", cursive; color-scheme: light;
-}
-[data-skin="relief"] body {
-  background: repeating-linear-gradient(45deg, rgba(60,40,10,.035) 0 2px, transparent 2px 6px), linear-gradient(#ebe2cf, #ddd1b8);
-  background-attachment: fixed;
-}
-[data-skin="relief"] header { background: linear-gradient(#f6efdf, #e7dcc4); border-bottom: 1px solid #c6b693; box-shadow: 0 3px 8px rgba(70,50,20,.15); }
-[data-skin="relief"] h1 { text-shadow: 0 1px 0 #fff; }
-[data-skin="relief"] ul {
-  background: linear-gradient(90deg, transparent 50px, #e9a9a3 50px, #e9a9a3 52px, transparent 52px), #fffdf6;
-  border: 1px solid #d3c5a6; box-shadow: 0 1px 0 #fff inset, 0 4px 10px rgba(70,50,20,.18), 0 1px 2px rgba(70,50,20,.25);
-}
-[data-skin="relief"] li { border-top-color: #d6e1ec; }
-[data-skin="relief"] .tap { padding-left: 12px; gap: 18px; }
-[data-skin="relief"] .box { background: linear-gradient(#fff, #ece4d2); border: 1px solid #a99878; border-radius: 6px; box-shadow: inset 0 1px 2px rgba(0,0,0,.15), 0 1px 0 #fff; }
-[data-skin="relief"] :is(.pill, .btn.ghost, .pad button, .mic, .skinbtn, .skinopt, .empty, .notifcard) {
-  background: linear-gradient(#fffdf8, #e9e0cd); border: 1px solid #b8a888; color: var(--ink);
-  box-shadow: 0 2px 0 #a8987a, 0 4px 8px rgba(70,50,20,.18), inset 0 1px 0 #fff;
-}
-[data-skin="relief"] :is(.pill, .btn, .pad button, .mic, .bigcta, .side):active { transform: translateY(2px); box-shadow: 0 0 0 #a8987a, inset 0 2px 4px rgba(0,0,0,.15); }
-[data-skin="relief"] .btn:not(.ghost) { background: linear-gradient(#5d4834, #3a2c1e); color: #fdf3dc; border: 1px solid #2a1f13; box-shadow: 0 2px 0 #1f160d, 0 4px 8px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.18); }
-[data-skin="relief"] .btn.go { background: linear-gradient(#69b85d, #3a7f33); border-color: #2c6226; color: #fff; }
-[data-skin="relief"] .btn.go.ready { background: linear-gradient(#ffe27a, #e9b730); border-color: #b88a14; color: #3a2a05; }
-[data-skin="relief"] .bigcta {
-  background: linear-gradient(#ffe27a, #e6b12a); color: #3a2a05; border: 1px solid #b88a14;
-  box-shadow: 0 3px 0 #a87d10, 0 8px 14px rgba(70,50,20,.25), inset 0 1px 0 rgba(255,255,255,.7);
-}
-[data-skin="relief"] .datebox {
-  font-family: "VT323", ui-monospace, monospace; font-weight: 400; font-size: clamp(2.6rem, 13vw, 3.4rem); letter-spacing: .08em;
-  background: linear-gradient(#bcc99c, #a7b886); color: #1f2b16; border: 3px solid #5a4a33; border-radius: 8px;
-  box-shadow: inset 0 3px 8px rgba(0,0,0,.35), 0 1px 0 #fff;
-}
-[data-skin="relief"] .datebox .ph { color: rgba(31,43,22,.18); }
-[data-skin="relief"] .datebox .sep { color: #1f2b16; }
-[data-skin="relief"] .datebox.ok { border-color: #3a7f33; }
-[data-skin="relief"] .tabs { background: linear-gradient(#4d3b29, #2f2418); border-top: 1px solid #6b5640; box-shadow: 0 -3px 10px rgba(0,0,0,.25); }
-[data-skin="relief"] .tabs button { color: #cdbb97; }
-[data-skin="relief"] .tabs button[aria-current="page"] { color: #ffe9a8; text-shadow: 0 0 10px rgba(255,220,120,.5); }
-[data-skin="relief"] .tabs button[aria-current="page"]::before { background: #ffe27a; box-shadow: 0 0 8px #ffe27a; }
-[data-skin="relief"] .badge { background: linear-gradient(#d9483a, #9e2a1f); color: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.3); }
-[data-skin="relief"] .badge.hl { background: linear-gradient(#ffe27a, #e6b12a); color: #3a2a05; }
-[data-skin="relief"] .qty { background: #fbe8a6; border: 1px dashed #c9a640; }
-[data-skin="relief"] .toast { background: #fff8d6; color: #2b2418; border: 1px solid #d8c47a; box-shadow: 0 6px 14px rgba(70,50,20,.3); transform: translateX(-50%) rotate(-.6deg); }
-[data-skin="relief"] .toast button { background: linear-gradient(#ffe27a, #e6b12a); }
-[data-skin="relief"] .side { color: var(--muted); }
-
-/* ---------- ARGILE · claymorphisme ---------- */
-:root[data-skin="argile"] {
-  --bg: #efe7ff; --card: #fbf8ff; --ink: #3a2e5c; --muted: #84799f; --line: #e8e0f7;
-  --hl: #ffb86b; --hl-ink: #3a2e5c; --ok: #2fb383; --ok-soft: #dcf6ec; --skip: #b3a9cb;
-  --bad: #e14f66; --warn: #b8690f; --radius: 28px;
-  --font-display: "Fredoka", "Nunito", system-ui, sans-serif; --font-body: "Nunito", "Atkinson Hyperlegible", system-ui, sans-serif;
-  color-scheme: light;
-}
-[data-skin="argile"] body {
-  background: radial-gradient(45% 30% at 0% 0%, #ffd6e8, transparent 70%), radial-gradient(45% 30% at 100% 25%, #d2efff, transparent 70%),
-    radial-gradient(50% 30% at 30% 100%, #ffe9c9, transparent 70%), #efe7ff;
-  background-attachment: fixed;
-}
-[data-skin="argile"] header { background: rgba(239,231,255,.82); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-bottom: 0; }
-[data-skin="argile"] h1 { font-weight: 700; }
-[data-skin="argile"] :is(ul, .empty, .notifcard, .pill, .pad button, .datebox, .mic, .btn.ghost, .skinbtn, .skinopt) {
-  background: var(--card); border: 0;
-  box-shadow: 8px 8px 18px rgba(124,98,190,.22), -6px -6px 14px rgba(255,255,255,.95),
-    inset 2px 2px 4px rgba(255,255,255,.9), inset -3px -3px 6px rgba(124,98,190,.10);
-}
-[data-skin="argile"] ul { margin-inline: 2px; }
-[data-skin="argile"] li { border-top: 2px solid #f1ebfc; }
-[data-skin="argile"] .box { border: 0; border-radius: 10px; background: #efe7ff; box-shadow: inset 3px 3px 6px rgba(124,98,190,.22), inset -3px -3px 6px #fff; }
-[data-skin="argile"] .pill, [data-skin="argile"] .btn, [data-skin="argile"] .pad button, [data-skin="argile"] .mic { border-radius: 20px; }
-[data-skin="argile"] .bigcta {
-  border-radius: 26px; background: linear-gradient(160deg, #ffcf9a, #ff9a6b); color: #3a1f12;
-  box-shadow: 0 12px 24px rgba(255,140,90,.35), inset 0 -6px 12px rgba(0,0,0,.08), inset 0 6px 12px rgba(255,255,255,.55);
-}
-[data-skin="argile"] .btn:not(.ghost) { background: linear-gradient(160deg, #9b86e0, #7c62be); color: #fff; border: 0; box-shadow: 0 10px 20px rgba(124,98,190,.35), inset 0 -5px 10px rgba(0,0,0,.1), inset 0 5px 10px rgba(255,255,255,.35); }
-[data-skin="argile"] .btn.go { background: linear-gradient(160deg, #6fe0b5, #2fb383); color: #08392a; }
-[data-skin="argile"] .btn.go.ready { background: linear-gradient(160deg, #ffcf9a, #ff9a6b); color: #3a1f12; }
-[data-skin="argile"] .qty { border-radius: 99px; background: #ffe2c2; padding: 1px 9px; }
-[data-skin="argile"] .badge { box-shadow: 0 4px 8px rgba(124,98,190,.35); }
-[data-skin="argile"] .badge.hl { background: #ffb86b; }
-[data-skin="argile"] .tabs {
-  left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); padding-bottom: 0; border: 0; border-radius: 28px;
-  background: var(--card); box-shadow: 0 14px 30px rgba(124,98,190,.3), inset 0 2px 4px #fff, inset 0 -4px 8px rgba(124,98,190,.12);
-}
-[data-skin="argile"] .tabs button[aria-current="page"] { color: #7c62be; }
-[data-skin="argile"] .tabs button[aria-current="page"]::before { top: auto; bottom: 8px; left: calc(50% - 4px); right: auto; width: 8px; height: 8px; border-radius: 50%; background: #7c62be; }
-[data-skin="argile"] .toast { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); border-radius: 22px; background: #3a2e5c; color: #fff; }
-[data-skin="argile"] .wrap { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
-[data-skin="argile"] .tag-exp { border-radius: 99px; color: #fff; }
-
-/* ---------- TECH · minimalisme high-tech, clair, premium ---------- */
-:root[data-skin="tech"] {
-  --bg: #f6f7f9; --card: #ffffff; --ink: #0b0d12; --muted: #6b7280; --line: #e4e7eb;
-  --hl: #2f6bff; --hl-ink: #ffffff; --ok: #00a775; --ok-soft: #e9f9f3; --skip: #a3a9b3;
-  --bad: #ef2b4f; --warn: #c26a00; --radius: 6px;
-  --font-display: "Sora", system-ui, sans-serif; --font-body: "Sora", system-ui, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, monospace; color-scheme: light;
-}
-[data-skin="tech"] body { background: radial-gradient(#d9dde3 1px, transparent 1.2px) 0 0 / 20px 20px, #f6f7f9; background-attachment: fixed; font-size: 17px; }
-[data-skin="tech"] header { background: rgba(246,247,249,.86); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
-[data-skin="tech"] h1 { font-weight: 600; letter-spacing: -.03em; }
-[data-skin="tech"] .sub, [data-skin="tech"] .aisle-h h2 { font-family: var(--mono); }
-[data-skin="tech"] .sub { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; }
-[data-skin="tech"] .aisle-h h2 { font-size: .74rem; font-weight: 500; text-transform: uppercase; letter-spacing: .16em; color: var(--muted); }
-[data-skin="tech"] .aisle-h.g-bad h2 { color: var(--bad); } [data-skin="tech"] .aisle-h.g-warn h2 { color: var(--warn); }
-[data-skin="tech"] section.current .aisle-h h2::after { background: var(--hl); color: #fff; border-radius: 2px; font-family: var(--mono); }
-[data-skin="tech"] :is(.n, .left, .badge, .when, .qty, .count, .datebox, .pad button, .note) { font-family: var(--mono); }
-[data-skin="tech"] .left b { background: var(--ink); color: #fff; border-radius: 3px; }
-[data-skin="tech"] ul { box-shadow: 0 1px 2px rgba(11,13,18,.04); }
-[data-skin="tech"] .name { font-size: 1.02rem; }
-[data-skin="tech"] .box { border-radius: 3px; border: 1.5px solid var(--ink); width: 24px; height: 24px; }
-[data-skin="tech"] .qty { background: transparent; border: 1px solid var(--line); color: var(--ink); font-size: .74rem; border-radius: 3px; }
-[data-skin="tech"] .side { text-transform: uppercase; letter-spacing: .1em; font-size: .62rem; }
-[data-skin="tech"] .pill, [data-skin="tech"] .skinbtn { border: 1px solid var(--line); border-radius: 4px; }
-[data-skin="tech"] .skinbtn { border-radius: 6px; }
-[data-skin="tech"] .btn { border-radius: 4px; text-transform: uppercase; letter-spacing: .08em; font-size: .85rem; font-weight: 600; }
-[data-skin="tech"] .btn.ghost { border: 1px solid var(--line); }
-[data-skin="tech"] .btn.go { background: var(--hl); border-color: var(--hl); color: #fff; }
-[data-skin="tech"] .btn.go.ready { background: var(--ink); border-color: var(--ink); color: #fff; box-shadow: 0 0 0 3px rgba(47,107,255,.35); animation: none; }
-[data-skin="tech"] .bigcta {
-  background: var(--ink); color: #fff; border-radius: 6px; text-transform: uppercase; letter-spacing: .12em; font-size: .95rem; font-weight: 600;
-  box-shadow: inset 0 -3px 0 var(--hl), 0 8px 24px rgba(47,107,255,.18);
-}
-[data-skin="tech"] .datebox { border: 1px solid var(--line); border-radius: 6px; font-weight: 500; letter-spacing: .12em; }
-[data-skin="tech"] .datebox.ok { border-color: var(--hl); box-shadow: 0 0 0 3px rgba(47,107,255,.15); }
-[data-skin="tech"] .pad button { border-radius: 4px; font-weight: 500; }
-[data-skin="tech"] .mic { border: 1px solid var(--ink); border-radius: 4px; text-transform: uppercase; letter-spacing: .1em; font-size: .85rem; }
-[data-skin="tech"] .mic.on { background: var(--hl); border-color: var(--hl); color: #fff; }
-[data-skin="tech"] .tabs { background: rgba(255,255,255,.9); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
-[data-skin="tech"] .tabs button { font-family: var(--mono); font-size: .68rem; text-transform: uppercase; letter-spacing: .12em; font-weight: 500; }
-[data-skin="tech"] .tabs svg { stroke-width: 1.5; }
-[data-skin="tech"] .tabs button[aria-current="page"]::before { left: 0; right: 0; height: 2px; border-radius: 0; background: var(--hl); }
-[data-skin="tech"] .badge { border-radius: 3px; }
-[data-skin="tech"] .badge.hl { background: var(--hl); color: #fff; }
-[data-skin="tech"] .when b { font-family: var(--mono); font-weight: 500; }
-[data-skin="tech"] .tag-exp { background: transparent; color: var(--bad); border: 1px solid var(--bad); border-radius: 2px; font-family: var(--mono); text-transform: uppercase; letter-spacing: .06em; font-size: .68rem; }
-[data-skin="tech"] .dot { border-radius: 1px; width: 8px; height: 8px; background: var(--hl); }
-[data-skin="tech"] .toast { border-radius: 6px; }
-[data-skin="tech"] .toast button { background: var(--hl); color: #fff; border-radius: 4px; }
-[data-skin="tech"] h1, [data-skin="tech"] .item-name { font-family: var(--font-display); }
-
-/* Le micro allumé garde sa couleur d'écoute dans tous les styles */
-[data-skin] .skinopt[aria-pressed="true"] { outline: 3px solid var(--ink); outline-offset: 2px; }
-[data-skin] .mic.on { background: var(--hl); color: var(--hl-ink); border-color: var(--hl); }
-
-@media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
-}
-</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Outfit:wght@500;700;800&family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="app.css">
+<script>
+  // Applique le style choisi avant l'affichage, pour éviter un flash.
+  try {
+    var skin = JSON.parse(localStorage.getItem("courses-v1") || "{}").skin;
+    if (/^(carnet|verre|argile)$/.test(skin)) document.documentElement.setAttribute("data-skin", skin);
+  } catch (e) {}
+</script>
 </head>
 <body>
-<script>
-try { var __s = JSON.parse(localStorage.getItem("courses-v1") || "{}").skin; document.documentElement.setAttribute("data-skin", __s || "carnet"); }
-catch (e) { document.documentElement.setAttribute("data-skin", "carnet"); }
-</script>
+<canvas id="fx3d" hidden></canvas>
 
 <div class="wrap">
   <header>
     <div class="top">
       <h1 id="viewTitle">À acheter</h1>
-      <div class="topr">
-        <div class="left" id="left"></div>
-        <button class="skinbtn" id="skinBtn" type="button" aria-label="Changer le style de l'appli">
+      <div class="top-right">
+        <div class="count" id="count"></div>
+        <button class="iconbtn" id="skinBtn" type="button" aria-label="Changer le style de l'appli">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.7-.9 1.4-1.8-.4-1 .3-2.2 1.4-2.2H17a4 4 0 0 0 4-4c0-5.5-4-10-9-10z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10.5" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/></svg>
         </button>
       </div>
@@ -594,20 +37,21 @@ catch (e) { document.documentElement.setAttribute("data-skin", "carnet"); }
     <p class="sub" id="viewSub"></p>
   </header>
 
-  <div class="view" id="v-courses">
-    <div id="list"></div>
-    <div class="empty" id="coursesDone" hidden>
+  <!-- Courses : ce qu'il reste à acheter -->
+  <main class="view" id="v-courses">
+    <div id="shopList"></div>
+    <div class="card empty" id="shopDone" hidden>
       <h2>Tout est dans le caddie</h2>
       <p class="small">En rentrant, ouvre l'onglet Ranger pour dater ce que tu ranges.</p>
       <button class="btn" type="button" data-go="ranger">Ranger les courses</button>
     </div>
     <div class="skipbar" id="skipBar" hidden>
       <span id="skipText"></span>
-      <button class="pill" id="resetBtn" type="button">Réafficher</button>
+      <button class="pill" id="unskipBtn" type="button">Réafficher</button>
     </div>
-    <details class="tools">
+    <details class="more">
       <summary>Ajouter un article · sauvegarde</summary>
-      <div class="tools-in">
+      <div class="more-in">
         <h3>Ajouter un article</h3>
         <form id="addForm" autocomplete="off">
           <input id="addName" placeholder="Ex. : Steaks hachés" aria-label="Nom de l'article" required>
@@ -622,87 +66,85 @@ catch (e) { document.documentElement.setAttribute("data-skin", "carnet"); }
         <p class="small" id="xferMsg" aria-live="polite"></p>
       </div>
     </details>
-  </div>
+  </main>
 
-  <div class="view" id="v-ranger" hidden>
-    <button class="bigcta" id="datesBtn" type="button">
+  <!-- Ranger : acheté, pas encore daté -->
+  <main class="view" id="v-ranger" hidden>
+    <button class="bigcta" id="rangeBtn" type="button">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
-      <span id="rangerCta">Ranger avec la voix</span>
+      <span id="rangeBtnText">Ranger avec la voix</span>
     </button>
-    <ul id="rangerList"></ul>
-    <div class="empty" id="rangerEmpty" hidden>
+    <ul class="rows block" id="rangeList"></ul>
+    <div class="card empty" id="rangeDone" hidden>
       <h2>Rien à ranger</h2>
       <p class="small">Ce que tu coches au magasin arrive ici, pour lui donner sa date.</p>
       <button class="btn ghost" type="button" data-go="frigo">Voir ce que j'ai chez moi</button>
     </div>
-  </div>
+  </main>
 
-  <div class="view" id="v-frigo" hidden>
-    <div class="notifcard" id="notifCard" hidden>
+  <!-- Chez moi : le stock, le plus urgent en haut -->
+  <main class="view" id="v-frigo" hidden>
+    <div class="card notice" id="notifCard" hidden>
       <span>Être prévenu 2 jours avant qu'un article périme.</span>
       <button class="pill accent" id="notifBtn" type="button">Activer</button>
     </div>
-    <div id="frigoList"></div>
-    <div class="empty" id="frigoEmpty" hidden>
+    <div id="stockList"></div>
+    <div class="card empty" id="stockEmpty" hidden>
       <h2>Rien en stock</h2>
       <p class="small">Ce que tu achètes et ranges apparaît ici, le plus urgent en haut.</p>
     </div>
-  </div>
+  </main>
 </div>
 
 <nav class="tabs" aria-label="Sections">
   <button type="button" data-tab="courses">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h8.9a1 1 0 0 0 1-.8L20 8H6.2"/><circle cx="9" cy="20" r="1.4"/><circle cx="17" cy="20" r="1.4"/></svg>
-    <span>Courses</span><b class="badge" id="bCourses" hidden></b>
+    <span>Courses</span><b class="badge" id="badgeCourses" hidden></b>
   </button>
   <button type="button" data-tab="ranger">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8l8-4 8 4v10l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v10"/></svg>
-    <span>Ranger</span><b class="badge" id="bRanger" hidden></b>
+    <span>Ranger</span><b class="badge hl" id="badgeRanger" hidden></b>
   </button>
   <button type="button" data-tab="frigo">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M5 10h14M9 6v1.5M9 13v3"/></svg>
-    <span>Chez moi</span><b class="badge" id="bFrigo" hidden></b>
+    <span>Chez moi</span><b class="badge bad" id="badgeFrigo" hidden></b>
   </button>
 </nav>
 
-<div class="skinsheet" id="skinSheet" hidden>
-  <button class="scrim" id="skinScrim" type="button" aria-label="Fermer"></button>
-  <div class="skinpanel" role="dialog" aria-modal="true" aria-labelledby="skinTitle">
-    <h2 id="skinTitle">Style de l'appli</h2>
-    <div class="skinlist" id="skinList">
-      <button class="skinopt" type="button" data-pick="carnet"><span class="sw sw-carnet"><i></i></span><b>Carnet</b><small>Sombre, surligneur jaune. Le style d'origine.</small></button>
-      <button class="skinopt" type="button" data-pick="verre"><span class="sw sw-verre"><i></i></span><b>Verre</b><small>Glassmorphisme : verre dépoli sur fond aurore.</small></button>
-      <button class="skinopt" type="button" data-pick="relief"><span class="sw sw-relief"><i></i></span><b>Relief</b><small>Skeuomorphisme : bloc-notes, cuir et minuteur LCD.</small></button>
-      <button class="skinopt" type="button" data-pick="argile"><span class="sw sw-argile"><i></i></span><b>Argile</b><small>Claymorphisme : formes pastel bombées et douces.</small></button>
-      <button class="skinopt" type="button" data-pick="tech"><span class="sw sw-tech"><i></i></span><b>Tech</b><small>Minimalisme high-tech : clair, net, premium.</small></button>
+<!-- Choix du style -->
+<div class="picker" id="picker" hidden>
+  <button class="scrim" type="button" data-close-picker aria-label="Fermer"></button>
+  <div class="picker-panel" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
+    <h2 id="pickerTitle">Style de l'appli</h2>
+    <div class="skins" id="skinList">
+      <button class="skin" type="button" data-pick="carnet"><span class="swatch carnet"></span><b>Carnet</b><small>Surligneur et confettis.</small></button>
+      <button class="skin" type="button" data-pick="verre"><span class="swatch verre"></span><b>Verre</b><small>Verre dépoli sur une aurore en 3D.</small></button>
+      <button class="skin" type="button" data-pick="argile"><span class="swatch argile"></span><b>Argile</b><small>Pâte à modeler pastel en 3D.</small></button>
     </div>
-    <button class="btn" id="skinClose" type="button">C'est bon</button>
+    <button class="btn" type="button" data-close-picker>C'est bon</button>
   </div>
 </div>
 
+<!-- Message en bas, avec « Annuler » -->
 <div class="toast" id="toast" hidden role="status" aria-live="polite">
   <span id="toastText"></span>
   <button type="button" id="undoBtn">Annuler</button>
 </div>
 
+<!-- Ranger : un article à la fois -->
 <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="lbName">
   <div class="sheet-in">
     <div class="sheet-top">
-      <span class="count" id="lbCount"></span>
+      <span class="progress" id="lbProgress"></span>
       <button class="pill" id="lbClose" type="button">Terminer</button>
     </div>
     <div>
-      <p class="item-sub" id="lbAisle"></p>
+      <p class="item-aisle" id="lbAisle"></p>
       <h2 class="item-name" id="lbName"></h2>
-      <p class="item-sub" id="lbCurrent"></p>
     </div>
     <div class="datebox" id="lbDate" aria-live="polite"></div>
     <p class="preview" id="lbPreview"></p>
-    <div id="lbKbd" hidden>
-      <label class="item-sub" for="lbDictate">Micro indisponible ici : touche le champ, puis le micro de ton clavier, et dis « 26 juin ».</label>
-      <input id="lbDictate" type="text" enterkeyhint="next" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Touche ici, puis le micro du clavier">
-    </div>
-    <button class="mic" id="lbMic" type="button" hidden>
+    <button class="mic" id="lbMic" type="button">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
       <span id="lbMicText">Dire la date</span>
     </button>
@@ -718,7 +160,7 @@ catch (e) { document.documentElement.setAttribute("data-skin", "carnet"); }
       <button class="pill" type="button" data-q="7">1 sem.</button>
       <button class="pill" type="button" data-q="30">1 mois</button>
     </div>
-    <div class="nav">
+    <div class="sheet-nav">
       <button class="btn ghost" id="lbPrev" type="button">Retour</button>
       <button class="btn ghost" id="lbSkip" type="button">Passer</button>
       <button class="btn go" id="lbOk" type="button" disabled>Valider</button>
@@ -726,780 +168,7 @@ catch (e) { document.documentElement.setAttribute("data-skin", "carnet"); }
   </div>
 </div>
 
-<script>
-(function () {
-  // Rayons dans l'ordre d'un supermarché type : le frais et les surgelés à la fin pour la chaîne du froid.
-  var AISLES = [
-    { id: "fl", name: "Fruits & légumes", items: [
-      ["Fruits", "", "bananes, pastèque…"], ["Concombres", "×2"], ["Carottes", "1 kg"], ["Poivrons", "×2"],
-      ["Salades feuille de chêne", "×3"], ["Brocolis", "×2"], ["Patates", "1 kg"], ["Oignons"], ["Échalotes"], ["Ail"]
-    ]},
-    { id: "pain", name: "Pain & petit-déjeuner", items: [
-      ["Pain de mie"], ["Pains à burger"], ["Tortillas"], ["Céréales"], ["Benco / chocolat en poudre"], ["Café en grains"]
-    ]},
-    { id: "sale", name: "Épicerie salée", items: [
-      ["Penne", "1 kg"], ["Spaghetti", "1 kg"], ["Riz", "1 kg"], ["Nouilles à ramen"], ["Sauce bolognaise en pot", "×2"],
-      ["Petits pois en conserve"], ["Maïs", "×4"], ["Olives en conserve", "×2"], ["Huile d'olive", "×2"],
-      ["Vinaigrette blanche"], ["Sauce soja sucrée"], ["Ketchup"], ["Mayonnaise"], ["Chips aux oignons"]
-    ]},
-    { id: "epices", name: "Épices & pâtisserie", items: [
-      ["Paprika"], ["Noix de muscade"], ["Ail en poudre"], ["Graines de sésame"], ["Farine T45", "2 kg"],
-      ["Levure de boulanger"], ["Sucre de canne"]
-    ]},
-    { id: "sucre", name: "Épicerie sucrée", items: [
-      ["BN / Pim's"], ["Compote pomme / pêche"], ["Bonbons sommeil"], ["Sirop de cassis"], ["Sirop de citron"]
-    ]},
-    { id: "boissons", name: "Boissons", items: [
-      ["Pack de Vittel", "6 L"], ["Pack de Cristalline"], ["Pack de Coca Zero"], ["Pack de 7Up Light"],
-      ["Jus d'orange", "×1"], ["Jus de pêche"], ["Pack de lait"], ["Vin blanc"], ["Vin rouge"]
-    ]},
-    { id: "jelly", name: "Animaux · Jelly", items: [
-      ["Croquettes"], ["Bâtons pour les dents"], ["Boîtes de pâtée", "×1"], ["Haricots verts", "×6"]
-    ]},
-    { id: "maison", name: "Entretien & maison", items: [
-      ["Liquide vaisselle"], ["Pastilles lave-vaisselle"], ["Sel lave-vaisselle"], ["Pods lessive"], ["Adoucissant"],
-      ["Sacs poubelle", "100 L"], ["Essuie-tout"], ["Papier toilette", "", "le plus doux"], ["Papier cuisson"],
-      ["Papier alu"], ["Film alimentaire"], ["Tableau blanc en rouleau"]
-    ]},
-    { id: "hygiene", name: "Hygiène", items: [
-      ["Gel douche"], ["Dentifrice"], ["Lingettes aloe vera"], ["Crème pour mes p'tites fesses !"]
-    ]},
-    { id: "viande", name: "Boucherie & charcuterie", items: [
-      ["Poulet en morceaux", "1,5 kg"], ["Émincés de poulet"], ["Poulet fermier"], ["Viande rouge"], ["Lardons"], ["Jambon"]
-    ]},
-    { id: "frais", name: "Frais & fromages", items: [
-      ["Yaourts 0 %", "×14 min"], ["Yaourts", "×14 min"], ["Œufs", "2 boîtes de 12"], ["Beurre à tartiner"],
-      ["Crème épaisse"], ["Vache qui rit"], ["Fromage à burger"], ["Parmesan râpé", "×4"], ["Mozza", "×4"],
-      ["Burrata", "×2"], ["Féta", "200 g"], ["Gnocchis à poêler"]
-    ]},
-    { id: "surgeles", name: "Surgelés", hint: "En dernier, pour que ça reste froid.", items: [
-      ["Steaks surgelés"], ["Nuggets de poulet"], ["Glace"]
-    ]},
-    { id: "pharma", name: "Pharmacie (hors magasin)", items: [
-      ["Médoc TDAH"]
-    ]}
-  ];
-
-  var KEY = "courses-v1";
-  var state = { marks: {}, custom: [], dates: {}, tab: "courses" };
-  try { var saved = JSON.parse(localStorage.getItem(KEY)); if (saved) state = Object.assign(state, saved); } catch (e) {}
-  // Reprise des données d'avant les onglets : « Pas besoin » voulait dire « j'en ai déjà », donc en stock.
-  if (!state.v) {
-    Object.keys(state.marks).forEach(function (k) { if (state.marks[k] === "skip") state.marks[k] = "got"; });
-    state.v = 2;
-  }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} syncForReminders(); }
-
-  function slug(s) { return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-"); }
-
-  // Noms des articles de base : un ajout perso du même nom n'est pas affiché en double.
-  var BASE = {};
-  AISLES.forEach(function (a) { a.items.forEach(function (it) { BASE[slug(it[0])] = true; }); });
-
-  // Construit la liste complète : articles de base + ajouts perso.
-  function aisles() {
-    return AISLES.map(function (a) {
-      var items = a.items.map(function (it) { return { id: a.id + ":" + slug(it[0]), name: it[0], qty: it[1] || "", note: it[2] || "" }; });
-      state.custom.forEach(function (c) { if (c.aisle === a.id && !BASE[slug(c.name)]) items.push({ id: c.id, name: c.name, qty: "", note: "ajouté", custom: true }); });
-      return { id: a.id, name: a.name, hint: a.hint, items: items };
-    });
-  }
-
-  var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
-  var CROSS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
-  var TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';
-
-  var listEl = document.getElementById("list");
-  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
-
-  // Toast « Annuler » pour rattraper un appui raté.
-  var toast = document.getElementById("toast"), toastText = document.getElementById("toastText"), toastTimer, lastUndo = null;
-  function showToast(text, undo) {
-    lastUndo = undo; toastText.textContent = text; toast.hidden = false;
-    document.getElementById("undoBtn").hidden = !undo;
-    clearTimeout(toastTimer); toastTimer = setTimeout(function () { toast.hidden = true; lastUndo = null; }, 4000);
-  }
-  document.getElementById("undoBtn").addEventListener("click", function () {
-    if (lastUndo) lastUndo(); toast.hidden = true; lastUndo = null; save(); render();
-  });
-
-  function findName(id) {
-    var n = ""; aisles().forEach(function (a) { a.items.forEach(function (it) { if (it.id === id) n = it.name; }); }); return n;
-  }
-
-  // ---------- Les trois parcours ----------
-  // Courses   : ce qu'il reste à acheter (rien de coché, ou en stock mais périmé).
-  // Ranger    : acheté, pas encore daté.
-  // Chez moi  : tout le stock, le plus urgent en haut.
-  // Un article coché au magasin passe en stock ; « Fini » ou « Jeté » le remet dans les courses.
-  var TAB = /^(courses|ranger|frigo)$/.test(state.tab) ? state.tab : "courses";
-  var VIEWS = {
-    courses: { title: "À acheter" },
-    ranger: { title: "À ranger" },
-    frigo: { title: "Chez moi" }
-  };
-  function isExpired(id) { var d = state.dates[id]; return validISO(d) && daysLeft(d) < 0; }
-  function needsBuying(id) { var m = state.marks[id]; return !m || (m === "got" && isExpired(id)); }
-  function toPutAway(id) { return state.marks[id] === "got" && !state.dates[id]; }
-
-  function setTab(t) {
-    TAB = t; state.tab = t; save(); render();
-    try { window.scrollTo(0, 0); } catch (e) {}
-  }
-  document.querySelector(".tabs").addEventListener("click", function (e) {
-    var b = e.target.closest("button[data-tab]"); if (b) setTab(b.getAttribute("data-tab"));
-  });
-  document.addEventListener("click", function (e) {
-    var b = e.target.closest("[data-go]"); if (b) setTab(b.getAttribute("data-go"));
-  });
-
-  function rowLabel(it, extra) {
-    return '<span class="label"><span class="name">' + esc(it.name) + "</span>" +
-      (it.qty ? '<span class="qty">' + esc(it.qty) + "</span>" : "") +
-      (it.note ? '<span class="note">' + esc(it.note) + "</span>" : "") + (extra || "") + "</span>";
-  }
-
-  function render() {
-    var all = aisles(), c = renderCourses(all), r = renderRanger(all), f = renderFrigo(all);
-    // Onglets
-    ["courses", "ranger", "frigo"].forEach(function (t) { $("v-" + t).hidden = t !== TAB; });
-    Array.prototype.forEach.call(document.querySelectorAll(".tabs button"), function (b) {
-      b.setAttribute("aria-current", b.getAttribute("data-tab") === TAB ? "page" : "false");
-    });
-    function badge(id, n, cls) { var el = $(id); el.textContent = n > 99 ? "99+" : n; el.hidden = !n; el.className = "badge " + (cls || ""); }
-    badge("bCourses", c.n); badge("bRanger", r.n, "hl"); badge("bFrigo", f.urgent, "bad");
-    // En-tête : titre de l'onglet, compteur, consigne
-    $("viewTitle").textContent = VIEWS[TAB].title;
-    var left = $("left"), sub = $("viewSub");
-    if (TAB === "courses") {
-      left.innerHTML = c.n ? "<b>" + c.n + "</b>" : "";
-      sub.innerHTML = c.current ? "Rayon en cours : <strong>" + esc(c.current) + "</strong> · touche ce qui va dans le caddie" : "Liste terminée";
-    } else if (TAB === "ranger") {
-      left.innerHTML = r.n ? "<b>" + r.n + "</b>" : "";
-      sub.textContent = r.n ? "En rangeant, dis la date de chaque article." : "Tout est rangé et daté.";
-    } else {
-      left.innerHTML = f.n ? "<b>" + f.n + "</b>" : "";
-      var parts = [];
-      if (f.expired) parts.push('<span class="t-bad">' + f.expired + (f.expired > 1 ? " périmés" : " périmé") + "</span>");
-      if (f.soon) parts.push('<span class="t-warn">' + f.soon + " à manger vite</span>");
-      sub.innerHTML = parts.length ? parts.join(" · ") : "Le plus urgent en haut.";
-    }
-  }
-
-  // ----- Courses -----
-  function renderCourses(all) {
-    var html = "", current = null, n = 0, nSkip = 0;
-    all.forEach(function (a) {
-      a.items.forEach(function (it) { if (state.marks[it.id] === "skip") nSkip++; });
-      var items = a.items.filter(function (it) { return needsBuying(it.id); });
-      if (!items.length) return;
-      n += items.length;
-      if (!current) current = a.name;
-      html += '<section class="' + (current === a.name ? "current" : "") + '">' +
-        '<div class="aisle-h"><h2>' + esc(a.name) + '</h2><span class="n">' + items.length + "</span></div>" +
-        (a.hint ? '<p class="hint">' + esc(a.hint) + "</p>" : "") + "<ul>";
-      items.forEach(function (it) {
-        var exp = isExpired(it.id) ? '<span class="tag-exp">Périmé le ' + shortDate(state.dates[it.id]) + " · à racheter</span>" : "";
-        html += '<li data-id="' + esc(it.id) + '">' +
-          '<button class="tap" type="button" data-act="got"><span class="box">' + CHECK + "</span>" + rowLabel(it, exp) + "</button>" +
-          (it.custom
-            ? '<button class="side" type="button" data-act="del" aria-label="Supprimer ' + esc(it.name) + '">' + TRASH + "Suppr.</button>"
-            : '<button class="side" type="button" data-act="skip">' + CROSS + "Pas besoin</button>") +
-          "</li>";
-      });
-      html += "</ul></section>";
-    });
-    $("list").innerHTML = html;
-    $("coursesDone").hidden = n > 0;
-    $("skipBar").hidden = !nSkip;
-    $("skipText").textContent = nSkip + (nSkip > 1 ? " articles mis de côté pour cette fois" : " article mis de côté pour cette fois");
-    return { n: n, current: current };
-  }
-
-  $("list").addEventListener("click", function (e) {
-    var btn = e.target.closest("button[data-act]"); if (!btn) return;
-    var li = btn.closest("li"), id = li.getAttribute("data-id"), act = btn.getAttribute("data-act");
-    var prev = state.marks[id], prevDate = state.dates[id], name = findName(id);
-    wake();
-    if (act === "del") {
-      var idx = state.custom.findIndex(function (c) { return c.id === id; });
-      if (idx < 0) return;
-      var removed = state.custom.splice(idx, 1)[0]; delete state.marks[id]; delete state.dates[id];
-      showToast("Supprimé : " + removed.name, function () {
-        state.custom.splice(idx, 0, removed); if (prev) state.marks[id] = prev; if (prevDate !== undefined) state.dates[id] = prevDate;
-      });
-      save(); render(); return;
-    }
-    if (act === "got") {
-      // Dans le caddie : en stock, à ranger. Une ancienne date ne vaut pas pour le nouveau paquet.
-      state.marks[id] = "got"; delete state.dates[id];
-      showToast("Pris : " + name + " · à ranger", null);
-    } else {
-      // Pas besoin cette fois : caché jusqu'à « Réafficher ». S'il était périmé, il est sorti du stock.
-      state.marks[id] = "skip"; if (validISO(prevDate) && daysLeft(prevDate) < 0) delete state.dates[id];
-      showToast("Pas besoin cette fois : " + name, null);
-    }
-    lastUndo = function () { if (prev) state.marks[id] = prev; else delete state.marks[id]; if (prevDate !== undefined) state.dates[id] = prevDate; };
-    $("undoBtn").hidden = false;
-    save();
-    try { if (navigator.vibrate) navigator.vibrate(act === "got" ? 15 : 8); } catch (err) {}
-    li.classList.add("leaving");
-    setTimeout(render, 380);
-  });
-
-  // Réafficher les « pas besoin » (avant une nouvelle course).
-  $("resetBtn").addEventListener("click", function () {
-    var before = {};
-    Object.keys(state.marks).forEach(function (k) { if (state.marks[k] === "skip") { before[k] = "skip"; delete state.marks[k]; } });
-    save(); render();
-    showToast("Articles réaffichés dans la liste", function () { Object.keys(before).forEach(function (k) { state.marks[k] = "skip"; }); });
-  });
-
-  // ----- Ranger -----
-  function renderRanger(all) {
-    var rows = [];
-    all.forEach(function (a) { a.items.forEach(function (it) { if (toPutAway(it.id)) rows.push({ it: it, aisle: a.name }); }); });
-    $("rangerList").innerHTML = rows.map(function (r) {
-      return '<li data-id="' + esc(r.it.id) + '"><button class="tap" type="button" data-act="date">' +
-        '<span class="dot" aria-hidden="true"></span>' + rowLabel({ name: r.it.name, qty: r.it.qty, note: r.aisle }) + "</button>" +
-        '<button class="side" type="button" data-act="none">' + CROSS + "Pas de date</button></li>";
-    }).join("");
-    $("rangerList").hidden = !rows.length;
-    $("datesBtn").hidden = !rows.length;
-    $("rangerCta").textContent = "Ranger avec la voix (" + rows.length + ")";
-    $("rangerEmpty").hidden = !!rows.length;
-    return { n: rows.length };
-  }
-  $("rangerList").addEventListener("click", function (e) {
-    var btn = e.target.closest("button[data-act]"); if (!btn) return;
-    var id = btn.closest("li").getAttribute("data-id");
-    if (btn.getAttribute("data-act") === "none") {
-      state.dates[id] = "none"; save(); render();
-      showToast("Sans date : " + findName(id), function () { delete state.dates[id]; });
-      return;
-    }
-    // Commencer la série à cet article, puis continuer avec les autres.
-    var q = stockQueue(), i = q.indexOf(id);
-    openLabeler(i > 0 ? q.slice(i).concat(q.slice(0, i)) : q);
-  });
-
-  // ----- Chez moi -----
-  var GROUPS = [
-    { id: "exp", title: "Périmé · à jeter", cls: "g-bad" },
-    { id: "soon", title: "À manger vite", cls: "g-warn" },
-    { id: "week", title: "Cette semaine", cls: "" },
-    { id: "later", title: "Plus tard", cls: "" },
-    { id: "undated", title: "Pas encore daté", cls: "g-muted" },
-    { id: "none", title: "Ne périme pas", cls: "g-muted", fold: true }
-  ];
-  function renderFrigo(all) {
-    var g = {}, n = 0, expired = 0, soon = 0;
-    GROUPS.forEach(function (x) { g[x.id] = []; });
-    all.forEach(function (a) { a.items.forEach(function (it) {
-      if (state.marks[it.id] !== "got") return;
-      n++;
-      var d = state.dates[it.id], k, days = null;
-      if (d === "none") k = "none";
-      else if (!validISO(d)) k = "undated";
-      else {
-        days = daysLeft(d);
-        k = days < 0 ? "exp" : days <= 2 ? "soon" : days <= 7 ? "week" : "later";
-        if (days < 0) expired++; else if (days <= 2) soon++;
-      }
-      g[k].push({ it: it, d: d, days: days });
-    }); });
-    var html = "";
-    GROUPS.forEach(function (x) {
-      var rows = g[x.id]; if (!rows.length) return;
-      rows.sort(function (a, b) { return (a.days == null ? 9e9 : a.days) - (b.days == null ? 9e9 : b.days); });
-      var body = "<ul>" + rows.map(function (r) {
-        var chip = "";
-        if (r.days != null) chip = '<span class="when ' + x.cls + '"><b>' + (r.days < 0 ? "−" + (-r.days) + " j" : r.days === 0 ? "Auj." : r.days === 1 ? "Demain" : r.days + " j") + "</b>" + shortDate(r.d) + "</span>";
-        else if (x.id === "undated") chip = '<span class="when g-muted"><b>Dater</b></span>';
-        return '<li data-id="' + esc(r.it.id) + '"><button class="tap" type="button" data-act="edit">' + rowLabel({ name: r.it.name, qty: r.it.qty }) + chip + "</button>" +
-          '<button class="side" type="button" data-act="done">' + (x.id === "exp" ? TRASH + "Jeté" : CHECK + "Fini") + "</button></li>";
-      }).join("") + "</ul>";
-      var head = '<div class="aisle-h ' + x.cls + '"><h2>' + x.title + '</h2><span class="n">' + rows.length + "</span></div>";
-      html += x.fold
-        ? '<details class="group"><summary>' + head + "</summary>" + body + "</details>"
-        : '<section class="group">' + head + body + "</section>";
-    });
-    $("frigoList").innerHTML = html;
-    $("frigoEmpty").hidden = n > 0;
-    return { n: n, expired: expired, soon: soon, urgent: expired + soon };
-  }
-  $("frigoList").addEventListener("click", function (e) {
-    var btn = e.target.closest("button[data-act]"); if (!btn) return;
-    var id = btn.closest("li").getAttribute("data-id");
-    if (btn.getAttribute("data-act") === "edit") { openLabeler([id]); return; }
-    // Fini (mangé) ou Jeté : sort du stock et revient dans la liste de courses.
-    var prev = state.dates[id], prevMark = state.marks[id], name = findName(id);
-    delete state.dates[id]; delete state.marks[id]; save(); render();
-    showToast(name + " · remis dans les courses", function () {
-      if (prev !== undefined) state.dates[id] = prev; if (prevMark) state.marks[id] = prevMark;
-    });
-  });
-
-  // Ajout d'un article perso.
-  var sel = document.getElementById("addAisle");
-  sel.innerHTML = AISLES.map(function (a) { return '<option value="' + a.id + '">' + esc(a.name) + "</option>"; }).join("");
-  document.getElementById("addForm").addEventListener("submit", function (e) {
-    e.preventDefault();
-    var input = document.getElementById("addName"), name = input.value.trim();
-    if (!name) return;
-    var item = { id: "c:" + Date.now().toString(36), name: name, aisle: sel.value };
-    state.custom.push(item); save(); render();
-    input.value = "";
-    showToast("Ajouté aux courses : " + name, function () { state.custom = state.custom.filter(function (c) { return c.id !== item.id; }); });
-  });
-
-  // Garde l'écran allumé pendant les courses, si le téléphone l'accepte.
-  var lock = null;
-  function wake() {
-    try {
-      if (lock || !navigator.wakeLock || document.visibilityState !== "visible") return;
-      navigator.wakeLock.request("screen").then(function (l) { lock = l; l.addEventListener("release", function () { lock = null; }); }).catch(function () {});
-    } catch (e) {}
-  }
-  // Au retour sur l'appli (par ex. le lendemain), on recalcule les dates dépassées.
-  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") { wake(); render(); checkReminders(); } });
-  wake();
-
-  // ---------- Dates de péremption ----------
-  function $(id) { return document.getElementById(id); }
-  var MONTHS = ["janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet", "aout", "septembre", "octobre", "novembre", "decembre"];
-  function pad2(n) { return (n < 10 ? "0" : "") + n; }
-  function today0() { var t = new Date(); t.setHours(0, 0, 0, 0); return t; }
-  function toISO(dt) { return dt.getFullYear() + "-" + pad2(dt.getMonth() + 1) + "-" + pad2(dt.getDate()); }
-  function fromISO(s) { var p = s.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
-  function validISO(s) { return /^\d{4}-\d{2}-\d{2}$/.test(s || ""); }
-  function daysLeft(s) { return Math.round((fromISO(s) - today0()) / 864e5); }
-  function rel(n) { return n < 0 ? "périmé depuis " + (-n) + " j" : n === 0 ? "aujourd'hui" : n === 1 ? "demain" : "dans " + n + " j"; }
-  function shortDate(s) { var p = s.split("-"); return p[2] + "/" + p[1] + (+p[0] !== new Date().getFullYear() ? "/" + p[0].slice(2) : ""); }
-
-  // Jour + mois (+ année facultative). Sans année : la prochaine occurrence, sauf si la date vient de passer.
-  function resolve(d, m, y) {
-    if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31)) return null;
-    var t = today0();
-    if (y == null) { y = t.getFullYear(); if (new Date(y, m - 1, d) < new Date(t.getTime() - 60 * 864e5)) y++; }
-    else if (y < 100) y += 2000;
-    var dt = new Date(y, m - 1, d);
-    return dt.getMonth() === m - 1 ? toISO(dt) : null;
-  }
-  function bufToISO(b) {
-    if (b.length === 4) return resolve(+b.slice(0, 2), +b.slice(2, 4));
-    if (b.length === 6) return resolve(+b.slice(0, 2), +b.slice(2, 4), +b.slice(4, 6));
-    return null;
-  }
-  function isoToBuf(s) { var p = s.split("-"); return p[2] + p[1] + p[0].slice(2); }
-
-  // Comprend « 2606 », « 26 06 », « 26/06/27 », « 26 juin », « premier juillet 2027 »…
-  function parseSpoken(text) {
-    var t = " " + text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "") + " ";
-    t = t.replace(/\b(premier|1er)\b/g, " 1 ");
-    var m = null;
-    MONTHS.forEach(function (name, i) { if (m === null && t.indexOf(name) >= 0) { m = i + 1; t = t.replace(name, "|"); } });
-    if (m !== null) {
-      var parts = t.split("|"), before = parts[0].match(/\d+/g), after = parts[1].match(/\d+/g);
-      if (!before) return null;
-      var y = after ? +after[0] : null;
-      if (y != null && !(y < 100 || (y >= 2000 && y < 2100))) y = null;
-      return resolve(+before[before.length - 1], m, y);
-    }
-    var runs = t.match(/\d+/g); if (!runs) return null;
-    var all = runs.join("");
-    if (all.length === 4 || all.length === 6) return bufToISO(all);
-    if (all.length === 8) return resolve(+all.slice(0, 2), +all.slice(2, 4), +all.slice(4));
-    if (runs.length >= 2) return resolve(+runs[0], +runs[1], runs[2] ? +runs[2] : null);
-    return null;
-  }
-
-  // Mode étiquetage : un article à la fois.
-  var sheet = $("sheet"), lb = { queue: [], pos: 0, buf: "", msg: "", voice: false, saved: 0 };
-  function itemInfo(id) {
-    var r = null;
-    aisles().forEach(function (a) { a.items.forEach(function (it) { if (it.id === id) r = { name: it.name, qty: it.qty, aisle: a.name }; }); });
-    return r;
-  }
-  // À ranger : acheté et pas encore daté.
-  // Ce qui est déjà daté, ou marqué « Pas de date », n'est jamais redemandé.
-  function stockQueue() {
-    var q = [];
-    aisles().forEach(function (a) { a.items.forEach(function (it) {
-      var m = state.marks[it.id], d = state.dates[it.id];
-      if (m === "got" && !d) q.push(it.id);
-    }); });
-    return q;
-  }
-  function openLabeler(ids) {
-    if (!ids.length) { showToast("Tout est déjà daté. Les prochains articles cochés apparaîtront ici.", null); return; }
-    lb.queue = ids; lb.pos = 0; lb.saved = 0; lb.misses = 0;
-    lb.voice = !DC; // mains libres : le micro s'ouvre tout seul (ou explique pourquoi il ne peut pas)
-    if (DC) startCapDictation(); // appelé directement depuis le clic, comme la dictée l'exige
-    sheet.hidden = false; document.body.style.overflow = "hidden";
-    showItem();
-  }
-  function closeLabeler() {
-    cancelAuto(); stopListening(); sheet.hidden = true;
-    if (DC && dcOn) DC.stop().catch(function () {}); document.body.style.overflow = "";
-    if (TAB === "ranger" && lb.saved && !stockQueue().length) TAB = state.tab = "frigo";
-    save(); render();
-    if (lb.saved) showToast(lb.saved + (lb.saved > 1 ? " dates enregistrées" : " date enregistrée"), null);
-  }
-  function showItem() {
-    if (lb.pos >= lb.queue.length) { closeLabeler(); return; }
-    var id = lb.queue[lb.pos], info = itemInfo(id) || { name: "?", qty: "", aisle: "" }, d = state.dates[id];
-    $("lbCount").textContent = (lb.pos + 1) + " / " + lb.queue.length;
-    $("lbAisle").textContent = info.aisle;
-    $("lbName").textContent = info.name + (info.qty ? " · " + info.qty : "");
-    $("lbCurrent").textContent = validISO(d) ? "Date actuelle : " + shortDate(d) + " (" + rel(daysLeft(d)) + ")" : "";
-    $("lbPrev").disabled = lb.pos === 0;
-    cancelAuto(); lb.buf = ""; lb.msg = ""; heard = ""; clearTimeout(heardT); $("lbDictate").value = ""; drawDate();
-    if (lb.voice) listen();
-  }
-  // Date entendue : elle attend la confirmation (un appui sur Valider, ou dire « oui »),
-  // puis l'article suivant arrive et le micro se relance tout seul.
-  function armAuto(iso) {
-    cancelAuto();
-    lb.pending = iso;
-    var ok = $("lbOk"); ok.classList.add("ready"); ok.textContent = "Valider";
-    drawDate();
-  }
-  function cancelAuto() {
-    lb.pending = null;
-    var ok = $("lbOk"); ok.classList.remove("ready"); ok.textContent = "Valider";
-  }
-  function drawDate() {
-    var b = lb.buf, slots = b.length > 4 ? 6 : 4, h = "";
-    for (var i = 0; i < slots; i++) {
-      if (i === 2 || i === 4) h += '<span class="sep">/</span>';
-      h += i < b.length ? b[i] : '<span class="ph">' + "JJMMAA"[i] + "</span>";
-    }
-    var iso = bufToISO(b), box = $("lbDate"), pv = $("lbPreview");
-    box.innerHTML = h; box.classList.toggle("ok", !!iso);
-    $("lbOk").disabled = !iso;
-    if (iso) {
-      pv.className = "preview ok";
-      pv.textContent = fromISO(iso).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) + " · " + rel(daysLeft(iso)) +
-        (lb.pending ? " · vérifie et touche Valider" : "");
-    } else if (lb.msg) { pv.className = "preview err"; pv.textContent = lb.msg; }
-    else if (b.length === 4 || b.length === 6) { pv.className = "preview err"; pv.textContent = "Cette date n'existe pas. Corrige avec ⌫."; }
-    else { pv.className = "preview"; pv.textContent = "Jour puis mois : 2606 pour le 26 juin"; }
-  }
-  function setDate(iso) {
-    cancelAuto();
-    var id = lb.queue[lb.pos];
-    state.dates[id] = iso; if (iso !== "none") lb.saved++;
-    save(); try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
-    if (SR && !DC) { lb.voice = true; lb.misses = 0; } // on enchaîne : le micro repart pour l'article suivant
-    lb.pos++; showItem();
-  }
-  function press(k) {
-    // Correction à la main pour cet article ; le micro reprend tout seul à l'article suivant.
-    cancelAuto(); stopListening(); lb.msg = ""; $("lbDictate").value = "";
-    if (k === "del") lb.buf = lb.buf.slice(0, -1);
-    else if (k === "clr") lb.buf = "";
-    else if (lb.buf.length < 6) lb.buf += k;
-    drawDate();
-  }
-  $("datesBtn").addEventListener("click", function () { openLabeler(stockQueue()); });
-  $("lbPad").addEventListener("click", function (e) { var k = e.target.closest("button"); if (k) press(k.getAttribute("data-k")); });
-  $("lbOk").addEventListener("click", function () { var iso = bufToISO(lb.buf); if (iso) setDate(iso); });
-  function skipItem() { lb.pos++; showItem(); }
-  function prevItem() { if (lb.pos > 0) { lb.pos--; showItem(); } else if (lb.voice) listen(); }
-  $("lbSkip").addEventListener("click", skipItem);
-  $("lbPrev").addEventListener("click", prevItem);
-  $("lbClose").addEventListener("click", closeLabeler);
-  $("lbChips").addEventListener("click", function (e) {
-    var c = e.target.closest("button"); if (!c) return;
-    var q = c.getAttribute("data-q");
-    if (q === "none") { setDate("none"); return; }
-    var dt = today0(); dt.setDate(dt.getDate() + (+q)); setDate(toISO(dt));
-  });
-  document.addEventListener("keydown", function (e) {
-    if (sheet.hidden || e.target.id === "lbDictate") return;
-    if (/^[0-9]$/.test(e.key)) press(e.key);
-    else if (e.key === "Backspace") press("del");
-    else if (e.key === "Enter") { e.preventDefault(); $("lbOk").click(); }
-    else if (e.key === "Escape") closeLabeler();
-  });
-
-  // Dictée : reconnaissance vocale du navigateur, sans bibliothèque.
-  var SR = window.SpeechRecognition || window.webkitSpeechRecognition, rec = null, listening = false;
-  $("lbMic").hidden = false; // toujours visible : s'il ne peut pas marcher, il explique pourquoi
-  function setMic(on) {
-    if (DC) return; // la dictée claude.ai gère son propre état
-    listening = on; $("lbMic").classList.toggle("on", on);
-    $("lbMicText").textContent = on ? "J'écoute… dis la date" : lb.voice ? "Dire la date" : "Micro en pause · toucher pour reprendre";
-  }
-  function stopListening() { var r = rec; rec = null; if (r) { try { r.abort(); } catch (e) {} } setMic(false); }
-  function norm(s) { return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
-  // Commandes vocales en plus des dates.
-  // Une phrase entendue : commande, ou date. final = afficher « pas compris » tout de suite si rien ne colle.
-  function handleHeard(list, final) {
-    for (var i = 0; i < list.length; i++) if (voiceCommand(list[i])) return true;
-    var iso = null;
-    for (i = 0; i < list.length && !iso; i++) iso = parseSpoken(list[i]);
-    if (iso) { lb.buf = isoToBuf(iso); lb.msg = ""; drawDate(); armAuto(iso); return true; }
-    if (final) { lb.buf = ""; lb.msg = "Pas compris « " + list[0].trim() + " ». Redis, par exemple « 26 juin »."; drawDate(); }
-    return false;
-  }
-  function voiceCommand(said) {
-    var t = norm(said);
-    if (lb.pending && /\b(oui|ok|okay|valide|valider|c'est bon|d'accord|parfait)\b/.test(t)) { setDate(lb.pending); return true; }
-    if (lb.pending && /\b(non|corrige|attends|attend)\b/.test(t)) { cancelAuto(); lb.buf = ""; lb.msg = ""; drawDate(); return true; }
-    if (/(pas|sans|aucune) (de )?date|pas besoin|ne perime pas/.test(t)) { setDate("none"); return true; }
-    if (/\b(passe|passer|suivant)\b/.test(t)) { skipItem(); return true; }
-    if (/\b(retour|precedent)\b/.test(t)) { prevItem(); return true; }
-    if (/\b(stop|termine|arrete|c'est fini)\b/.test(t)) { closeLabeler(); return true; }
-    return false;
-  }
-  var NO_SR_MSG = "Pas de dictée dans ce navigateur. Ouvre l'appli par son icône, ou dans Chrome.";
-  var micOk = false;
-  function micFail(code) {
-    lb.voice = false;
-    var m = {
-      "not-allowed": "Micro refusé : Chrome ⋮ → Paramètres des sites → Micro → autorise ce site.",
-      "NotAllowedError": "Micro refusé : Chrome ⋮ → Paramètres des sites → Micro → autorise ce site.",
-      "service-not-allowed": "Dictée Google désactivée sur le téléphone : active l'appli Google.",
-      "audio-capture": "Micro occupé par une autre appli. Ferme-la et réessaie.",
-      "NotFoundError": "Aucun micro trouvé sur cet appareil.",
-      "network": "La dictée a besoin d'internet. Vérifie ta connexion.",
-      "language-not-supported": "Dictée en français indisponible sur ce téléphone."
-    }[code] || "Le micro n'a pas marché. Touche le bouton micro.";
-    lb.msg = m + " (code : " + code + ")";
-    drawDate();
-  }
-  function listen() {
-    stopListening();
-    if (sheet.hidden) return;
-    if (!SR) { lb.voice = false; lb.msg = NO_SR_MSG; drawDate(); return; }
-    // 1re fois : on demande clairement l'accès au micro, pour que Chrome affiche sa question.
-    if (!micOk && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      setMic(true);
-      navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) {
-        s.getTracks().forEach(function (t) { t.stop(); });
-        micOk = true; if (!sheet.hidden && lb.voice) listen(); else setMic(false);
-      }, function (err) { setMic(false); micFail(err && err.name || "inconnu"); });
-      return;
-    }
-    var r; try { r = new SR(); } catch (e) { micFail("création impossible"); return; }
-    rec = r; lb.relisten = false; r.lang = "fr-FR"; r.interimResults = false; r.maxAlternatives = 5;
-    r.onresult = function (ev) {
-      if (rec !== r) return;
-      var alts = ev.results[0], list = [];
-      lb.misses = 0;
-      for (var i = 0; i < alts.length; i++) list.push(alts[i].transcript);
-      // Date entendue : le micro s'arrête et attend Valider. Sinon on réécoute.
-      if (!handleHeard(list, true)) lb.relisten = true;
-    };
-    r.onerror = function (ev) {
-      if (rec !== r) return;
-      if (ev.error === "aborted") return;
-      if (ev.error === "no-speech") {
-        lb.misses = (lb.misses || 0) + 1;
-        if (lb.misses < 3) lb.relisten = true;
-        else { lb.voice = false; lb.misses = 0; lb.msg = "Micro en pause. Touche le bouton micro pour reprendre."; }
-        drawDate();
-      } else micFail(ev.error);
-    };
-    r.onend = function () {
-      if (rec !== r) return;
-      rec = null; setMic(false);
-      if (lb.relisten && lb.voice && !sheet.hidden) { lb.relisten = false; setTimeout(listen, 250); }
-    };
-    try { r.start(); setMic(true); } catch (e) { rec = null; setMic(false); }
-  }
-  $("lbMic").addEventListener("click", function () {
-    if (DC) { if (dcOn) DC.stop().catch(function () {}); else startCapDictation(); return; }
-    if (listening) { lb.voice = false; stopListening(); }
-    else { lb.voice = true; lb.misses = 0; cancelAuto(); listen(); }
-  });
-
-  // Dictée de claude.ai (page ouverte dans Chrome) : une seule écoute continue pour toute la série.
-  var DC = null, dcOn = false, heard = "", heardT = null;
-  function startCapDictation() {
-    if (!DC) return;
-    DC.start({ language: "fr" }).catch(function (e) {
-      var c = e && e.code;
-      if (c === "not_granted") lb.msg = "Micro refusé. Tu peux le réactiver dans le menu Autorisations de la page.";
-      else if (c === "unavailable") { lb.msg = "Dictée indisponible ici. Tape la date."; $("lbMic").hidden = true; }
-      else if (c && c !== "stopped" && c !== "dismissed") lb.msg = "Le micro n'a pas démarré. Touche le bouton micro.";
-      if (!sheet.hidden) drawDate();
-    });
-  }
-  try {
-    if (window.claude && window.claude.use) window.claude.use("dictation").then(function (d) {
-      if (!d) return;
-      DC = d; SR = null;
-      $("lbMic").hidden = false;
-      d.onState(function (s) {
-        dcOn = s.state === "listening" || s.state === "starting";
-        listening = dcOn; $("lbMic").classList.toggle("on", dcOn);
-        $("lbMicText").textContent = dcOn ? "J'écoute… dis la date" : "Dire la date";
-      });
-      d.onPartial(function (x) {
-        if (sheet.hidden || lb.pending || !x.text) return;
-        var pv = $("lbPreview"); pv.className = "preview"; pv.textContent = "« " + (heard + " " + x.text).trim() + " »";
-      });
-      d.onFinal(function (x) {
-        if (sheet.hidden || !x.text.trim()) return;
-        heard = (heard + " " + x.text).trim();
-        clearTimeout(heardT);
-        if (handleHeard([heard], false)) { heard = ""; return; }
-        // La date arrive parfois en deux morceaux (« 26 » puis « juin ») : on attend un peu avant de dire « pas compris ».
-        heardT = setTimeout(function () { if (heard) { handleHeard([heard], true); heard = ""; } }, 2200);
-      });
-    }).catch(function () {});
-  } catch (e) {}
-
-  // Dictée par le clavier du téléphone : le texte arrive dans le champ, on le lit au fur et à mesure.
-  var dict = $("lbDictate");
-  dict.addEventListener("input", function () {
-    stopListening(); lb.voice = false;
-    var iso = parseSpoken(dict.value);
-    if (iso) { lb.buf = isoToBuf(iso); lb.msg = ""; }
-    else { lb.buf = ""; lb.msg = ""; }
-    drawDate();
-  });
-  dict.addEventListener("keydown", function (e) {
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    var iso = parseSpoken(dict.value);
-    if (iso) { setDate(iso); dict.focus(); }
-    else if (dict.value.trim()) { lb.msg = "Pas compris « " + dict.value.trim() + " ». Efface et redis, par exemple « 26 juin »."; drawDate(); }
-  });
-  dict.addEventListener("focus", function () {
-    setTimeout(function () { try { $("lbDate").scrollIntoView({ block: "start", behavior: "smooth" }); } catch (e) {} }, 300);
-  });
-
-  // ---------- Rappels : notification 2 jours avant la date, puis quand elle est dépassée ----------
-  // Le service worker (sw.js) lit le stock daté dans IndexedDB et affiche les notifications,
-  // à l'ouverture de l'appli et environ une fois par jour en arrière-plan quand Android le permet.
-  var canNotify = false;
-  try {
-    canNotify = "serviceWorker" in navigator && "Notification" in window && "indexedDB" in window &&
-      window.isSecureContext && location.protocol !== "file:";
-  } catch (e) {}
-  function idb(fn) {
-    return new Promise(function (res, rej) {
-      var r = indexedDB.open("courses", 1);
-      r.onupgradeneeded = function () { r.result.createObjectStore("kv"); };
-      r.onerror = function () { rej(r.error); };
-      r.onsuccess = function () {
-        var tx = r.result.transaction("kv", "readwrite"), out = fn(tx.objectStore("kv"));
-        tx.oncomplete = function () { res(out && out.result); };
-        tx.onerror = function () { rej(tx.error); };
-      };
-    });
-  }
-  function syncForReminders() {
-    if (!canNotify) return Promise.resolve();
-    var list = [];
-    aisles().forEach(function (a) { a.items.forEach(function (it) {
-      var d = state.dates[it.id]; if (state.marks[it.id] === "got" && validISO(d)) list.push({ id: it.id, name: it.name, date: d });
-    }); });
-    try { return idb(function (s) { return s.put(list, "stock"); }).catch(function () {}); } catch (e) { return Promise.resolve(); }
-  }
-  function registerDaily() {
-    try {
-      navigator.serviceWorker.ready.then(function (reg) {
-        if (!reg.periodicSync) return;
-        return navigator.permissions.query({ name: "periodic-background-sync" }).then(function (st) {
-          if (st.state === "granted") return reg.periodicSync.register("check-dates", { minInterval: 12 * 3600 * 1000 });
-        });
-      }).catch(function () {});
-    } catch (e) {}
-  }
-  function checkReminders() {
-    if (!canNotify || Notification.permission !== "granted") return;
-    syncForReminders().then(function () { return navigator.serviceWorker.ready; }).then(function (reg) {
-      if (reg.active) reg.active.postMessage({ type: "check" });
-    }).catch(function () {});
-  }
-  var nb = $("notifBtn");
-  function drawNotifBtn() {
-    var card = $("notifCard");
-    if (!canNotify) { card.hidden = true; return; }
-    var p = Notification.permission;
-    card.hidden = p === "granted";
-    nb.textContent = p === "denied" ? "Bloqué" : "Activer";
-  }
-  nb.addEventListener("click", function () {
-    if (Notification.permission === "denied") {
-      showToast("Rappels bloqués : autorise les notifications de l'appli dans les réglages du téléphone.", null); return;
-    }
-    Notification.requestPermission().then(function (p) {
-      drawNotifBtn();
-      if (p !== "granted") return;
-      registerDaily(); checkReminders();
-      showToast("Rappels activés : tu seras prévenu 2 jours avant une date.", null);
-    });
-  });
-  drawNotifBtn();
-  if (canNotify && Notification.permission === "granted") { registerDaily(); checkReminders(); }
-
-  // ---------- Styles de l'appli ----------
-  var SKINS = { carnet: "#0e0e10", verre: "#1a1240", relief: "#e6dcc6", argile: "#efe7ff", tech: "#f6f7f9" };
-  function applySkin(k) {
-    if (!SKINS[k]) k = "carnet";
-    document.documentElement.setAttribute("data-skin", k);
-    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute("content", SKINS[k]);
-    Array.prototype.forEach.call(document.querySelectorAll(".skinopt"), function (b) {
-      b.setAttribute("aria-pressed", b.getAttribute("data-pick") === k ? "true" : "false");
-    });
-  }
-  applySkin(state.skin);
-  $("skinBtn").addEventListener("click", function () { $("skinSheet").hidden = false; });
-  function closeSkins() { $("skinSheet").hidden = true; }
-  $("skinScrim").addEventListener("click", closeSkins);
-  $("skinClose").addEventListener("click", closeSkins);
-  $("skinList").addEventListener("click", function (e) {
-    var b = e.target.closest("[data-pick]"); if (!b) return;
-    state.skin = b.getAttribute("data-pick"); applySkin(state.skin); save();
-  });
-
-  // ---------- Transfert entre versions (page en ligne ↔ fichier) ----------
-  var PREFIX = "COURSES1:";
-  function exportCode() { return PREFIX + btoa(unescape(encodeURIComponent(JSON.stringify(state)))); }
-  function importCode(code) {
-    code = (code || "").trim();
-    if (code.indexOf(PREFIX) === 0) code = code.slice(PREFIX.length);
-    var data = JSON.parse(decodeURIComponent(escape(atob(code.replace(/\s+/g, "")))));
-    if (!data || typeof data.marks !== "object") throw new Error("format");
-    return {
-      marks: data.marks || {}, custom: Array.isArray(data.custom) ? data.custom : [],
-      skin: data.skin, tab: data.tab, v: data.v || 2, dates: data.dates && typeof data.dates === "object" ? data.dates : {}
-    };
-  }
-  $("exportBtn").addEventListener("click", function () {
-    var ta = $("xfer"), msg = $("xferMsg"), code = exportCode();
-    ta.value = code;
-    function manual() { ta.focus(); ta.select(); msg.textContent = "Le code est sélectionné ci-dessus : copie-le, puis colle-le dans l'autre version."; }
-    try {
-      navigator.clipboard.writeText(code).then(function () {
-        msg.textContent = "Copié. Ouvre l'autre version, colle le code en bas de page et appuie sur « Importer ce code ».";
-      }, manual);
-    } catch (e) { manual(); }
-  });
-  $("importBtn").addEventListener("click", function () {
-    var msg = $("xferMsg"), next;
-    try { next = importCode($("xfer").value); }
-    catch (e) { msg.textContent = "Ce code n'est pas reconnu. Recopie-le en entier depuis « Copier mes données »."; return; }
-    var before = state; state = next; save(); render();
-    $("xfer").value = "";
-    var n = Object.keys(next.marks).length, c = next.custom.length, d = Object.keys(next.dates).filter(function (k) { return validISO(next.dates[k]); }).length;
-    msg.textContent = "Importé : " + n + " article(s) cochés, " + c + " ajout(s), " + d + " date(s).";
-    showToast("Données importées", function () { state = before; });
-  });
-
-  render();
-})();
-</script>
-<script>
-if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
-  navigator.serviceWorker.register("sw.js").catch(function () {});
-}
-</script>
+<script src="effects.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

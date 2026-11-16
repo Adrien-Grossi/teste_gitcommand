@@ -1,89 +1,88 @@
-// Service worker de « Mes courses » :
-// 1. garde l'appli disponible hors ligne (page : réseau d'abord pour les mises à jour, cache sinon) ;
-// 2. affiche les rappels de péremption (2 jours avant, puis le jour où la date est dépassée).
-var CACHE = "courses-v9";
-var FILES = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png"];
-var LEAD = 2; // jours d'avance pour le rappel
+/* =========================================================================
+   Mes courses · service worker
+   1. Hors ligne :
+      - fichiers de l'appli (page, styles, scripts) : réseau d'abord, pour recevoir les mises à jour ;
+      - bibliothèques, icônes et polices : cache d'abord, elles ne changent pas.
+   2. Rappels de péremption : 2 jours avant la date, puis le jour où elle est dépassée.
+   Changer CACHE à chaque mise en ligne qui modifie la liste ci-dessous.
+   ========================================================================= */
+const CACHE = "courses-v10";
+const APP_FILES = ["./", "index.html", "app.css", "app.js", "effects.js", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png"];
+const LEAD_DAYS = 2;
 
-self.addEventListener("install", function (e) {
-  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(FILES); }).then(function () { return self.skipWaiting(); }));
+self.addEventListener("install", (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(APP_FILES)).then(() => self.skipWaiting()));
 });
-self.addEventListener("activate", function (e) {
-  e.waitUntil(caches.keys().then(function (keys) {
-    return Promise.all(keys.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); }));
-  }).then(function () { return self.clients.claim(); }));
+self.addEventListener("activate", (e) => {
+  e.waitUntil(caches.keys()
+    .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+    .then(() => self.clients.claim()));
 });
-self.addEventListener("fetch", function (e) {
-  var req = e.request;
+
+function remember(req, res) {
+  if (res && (res.ok || res.type === "opaque")) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
+  return res;
+}
+const networkFirst = (req) => fetch(req).then((res) => remember(req, res))
+  .catch(() => caches.match(req, { ignoreSearch: true }).then((r) => r || caches.match("index.html")));
+const cacheFirst = (req) => caches.match(req).then((r) => r || fetch(req).then((res) => remember(req, res)));
+
+self.addEventListener("fetch", (e) => {
+  const req = e.request;
   if (req.method !== "GET") return;
-  var url = new URL(req.url);
+  const url = new URL(req.url);
   if (url.origin === location.origin) {
-    e.respondWith(fetch(req).then(function (res) {
-      var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); });
-      return res;
-    }).catch(function () {
-      return caches.match(req, { ignoreSearch: true }).then(function (r) { return r || caches.match("index.html"); });
-    }));
-  } else if (/fonts\.(googleapis|gstatic)\.com$/.test(url.hostname)) {
-    e.respondWith(caches.match(req).then(function (r) {
-      return r || fetch(req).then(function (res) { var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); return res; });
-    }));
+    e.respondWith(/\/vendor\/|\.png$/.test(url.pathname) ? cacheFirst(req) : networkFirst(req));
+  } else if (/^fonts\.(googleapis|gstatic)\.com$/.test(url.hostname)) {
+    e.respondWith(cacheFirst(req));
   }
 });
 
-// ---------- Rappels ----------
+/* ---------- Rappels ----------------------------------------------------- */
 function idb(fn) {
-  return new Promise(function (res, rej) {
-    var r = indexedDB.open("courses", 1);
-    r.onupgradeneeded = function () { r.result.createObjectStore("kv"); };
-    r.onerror = function () { rej(r.error); };
-    r.onsuccess = function () {
-      var tx = r.result.transaction("kv", "readwrite"), out = fn(tx.objectStore("kv"));
-      tx.oncomplete = function () { res(out && out.result); };
-      tx.onerror = function () { rej(tx.error); };
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open("courses", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("kv");
+    r.onerror = () => reject(r.error);
+    r.onsuccess = () => {
+      const tx = r.result.transaction("kv", "readwrite"), out = fn(tx.objectStore("kv"));
+      tx.oncomplete = () => resolve(out && out.result);
+      tx.onerror = () => reject(tx.error);
     };
   });
 }
 function daysLeft(iso) {
-  var p = iso.split("-"), d = new Date(+p[0], +p[1] - 1, +p[2]), t = new Date();
+  const [y, m, d] = iso.split("-").map(Number), t = new Date();
   t.setHours(0, 0, 0, 0);
-  return Math.round((d - t) / 864e5);
+  return Math.round((new Date(y, m - 1, d) - t) / 864e5);
 }
-function checkDates() {
-  return Promise.all([idb(function (s) { return s.get("stock"); }), idb(function (s) { return s.get("sent"); })]).then(function (r) {
-    var stock = r[0] || [], sent = r[1] || {}, now = {}, jobs = [];
-    stock.forEach(function (it) {
-      var n = daysLeft(it.date), level = n < 0 ? "expired" : n <= LEAD ? "soon" : null;
-      if (!level) return;
-      var key = it.id + "|" + it.date + "|" + level;
-      now[key] = 1;
-      if (sent[key]) return; // une seule notification par article et par étape
-      var dd = it.date.slice(8, 10) + "/" + it.date.slice(5, 7), title, body;
-      if (level === "soon") {
-        title = "Attention : " + it.name;
-        body = (n === 0 ? "Périme aujourd'hui" : n === 1 ? "Risque de périmer demain" : "Risque de périmer dans " + n + " jours") +
-          " (" + dd + "). À manger vite !";
-      } else {
-        title = it.name + " : date dépassée";
-        body = "Péremption dépassée (" + dd + "). Remis dans ta liste de courses.";
-      }
-      jobs.push(self.registration.showNotification(title, {
-        body: body, tag: it.id, icon: "icon-192.png", badge: "icon-192.png", data: { url: "./" }
-      }));
-    });
-    return Promise.all(jobs).then(function () { return idb(function (s) { return s.put(now, "sent"); }); });
-  });
+// Une notification par article et par étape (« bientôt », puis « dépassée »), jamais répétée.
+async function checkDates() {
+  const stock = (await idb((s) => s.get("stock"))) || [];
+  const sent = (await idb((s) => s.get("sent"))) || {};
+  const current = {}, shown = [];
+  for (const it of stock) {
+    const n = daysLeft(it.date), step = n < 0 ? "expired" : n <= LEAD_DAYS ? "soon" : null;
+    if (!step) continue;
+    const key = it.id + "|" + it.date + "|" + step;
+    current[key] = 1;
+    if (sent[key]) continue;
+    const dd = it.date.slice(8, 10) + "/" + it.date.slice(5, 7);
+    const title = step === "soon" ? "Attention : " + it.name : it.name + " : date dépassée";
+    const body = step === "soon"
+      ? (n === 0 ? "Périme aujourd'hui" : n === 1 ? "Risque de périmer demain" : "Risque de périmer dans " + n + " jours") + " (" + dd + "). À manger vite !"
+      : "Péremption dépassée (" + dd + "). Remis dans ta liste de courses.";
+    shown.push(self.registration.showNotification(title, { body, tag: it.id, icon: "icon-192.png", badge: "icon-192.png", data: { url: "./" } }));
+  }
+  await Promise.all(shown);
+  await idb((s) => s.put(current, "sent"));
 }
-self.addEventListener("message", function (e) {
-  if (e.data && e.data.type === "check") e.waitUntil(checkDates());
-});
-self.addEventListener("periodicsync", function (e) {
-  if (e.tag === "check-dates") e.waitUntil(checkDates());
-});
-self.addEventListener("notificationclick", function (e) {
+self.addEventListener("message", (e) => { if (e.data && e.data.type === "check") e.waitUntil(checkDates()); });
+self.addEventListener("periodicsync", (e) => { if (e.tag === "check-dates") e.waitUntil(checkDates()); });
+self.addEventListener("notificationclick", (e) => {
   e.notification.close();
-  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (list) {
-    for (var i = 0; i < list.length; i++) if ("focus" in list[i]) return list[i].focus();
-    return self.clients.openWindow("./");
+  e.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+    const open = list.find((c) => "focus" in c);
+    return open ? open.focus() : self.clients.openWindow("./");
   }));
 });
