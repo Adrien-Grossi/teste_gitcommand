@@ -62,7 +62,7 @@
   const GLASS_DEFAULTS = {
     colors: ["#293dd9", "#8040f2", "#ff5c8c", "#ff8f4d", "#1ac7cc"],
     complexity: 3, size: 1, fusion: 0.24, lace: 0.4, speed: 1,
-    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, smoke: 0, smokeColor: "#1b1a2e", impurity: 0, tshadow: 1, light: 1, round: 1, thick: 1.6, reflect: 0.8, counter: 1, cwidth: 1, crough: 0.2,
+    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, smoke: 0, smokeColor: "#1b1a2e", impurity: 0, impsize: 1, tshadow: 1, light: 1, round: 1, thick: 1.6, reflect: 0.8, counter: 1, cwidth: 1, crough: 0.2,
     // Sources lumineuses posées dans le fond (1 à 3) : x, y sur l'écran (0 à 1), taille et
     // profondeur derrière le verre (0 à 1), intensité (0 à 2), couleur.
     lights: [
@@ -867,6 +867,7 @@
     { group: "labGlass", key: "thick", label: "Épaisseur du verre", min: 0.4, max: 5, step: 0.1, show: (v) => (v > 3 ? "très épais (" + v.toFixed(1) + ")" : v.toFixed(1)) },
     { group: "labGlass", key: "diffraction", label: "Diffraction (couleurs séparées)", min: 0, max: 2, step: 0.02, show: (v) => (v ? pct(v) : "aucune") },
     { group: "labGlass", key: "impurity", label: "Impuretés du verre", min: 0, max: 2, step: 0.02, show: (v) => (v ? (v < 0.5 ? "légères" : v < 1.2 ? "marquées" : "très marquées") + " (" + pct(v) + ")" : "verre pur") },
+    { group: "labGlass", key: "impsize", label: "Taille des impuretés", min: 0.2, max: 5, step: 0.05, show: (v) => (v < 0.5 ? "atomiques" : v < 0.9 ? "fines" : v < 1.4 ? "moyennes" : v < 2.5 ? "grosses" : "immenses") + " (×" + v.toFixed(2) + ")" },
     { group: "labGlass", key: "frost", label: "Flou (verre dépoli)", min: 0, max: 2, step: 0.02, show: (v) => (v ? pct(v) : "clair") },
     { group: "labGlass", key: "smoke", label: "Verre fumé (teinte)", min: 0, max: 1.5, step: 0.02, show: (v) => (v ? pct(v) : "clair") },
     { group: "labGlass", key: "reflect", label: "Reflets du décor sur le bord", min: 0, max: 2, step: 0.05, show: (v) => (v ? pct(v) : "aucun") },

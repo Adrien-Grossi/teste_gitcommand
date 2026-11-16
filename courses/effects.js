@@ -43,7 +43,7 @@
   const glass = {
     colors: ["#293dd9", "#8040f2", "#ff5c8c", "#ff8f4d", "#1ac7cc"],
     complexity: 3, size: 1, fusion: 0.24, lace: 0.4, speed: 1,
-    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, smoke: 0, smokeColor: "#1b1a2e", impurity: 0, tshadow: 1, light: 1, round: 1, thick: 1.6, reflect: 0.8, counter: 1, cwidth: 1, crough: 0.2,
+    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, smoke: 0, smokeColor: "#1b1a2e", impurity: 0, impsize: 1, tshadow: 1, light: 1, round: 1, thick: 1.6, reflect: 0.8, counter: 1, cwidth: 1, crough: 0.2,
     // Sources lumineuses posées dans le fond (1 à 3) : x, y sur l'écran (0 à 1), taille et
     // profondeur derrière le verre (0 à 1), intensité (0 à 2), couleur.
     lights: [
@@ -370,7 +370,7 @@
       "uniform vec2 res; uniform float t, scroll, oct, warp, size, fusion, lace, ncol, px;",
       "uniform vec3 cols[8];",
       "uniform vec4 cards[" + MAX_CARDS + "]; uniform float crad[" + MAX_CARDS + "]; uniform float ncard;",
-      "uniform float gZoom, gBezel, gDisp, gFrost, gLight, gRound, gThick, gReflect, gCounter, gCw, gRough, gSmoke, gImp;",
+      "uniform float gZoom, gBezel, gDisp, gFrost, gLight, gRound, gThick, gReflect, gCounter, gCw, gRough, gSmoke, gImp, gImpS;",
       "uniform vec3 smokeCol;",
       "uniform vec4 lPos[3], lCol[3]; uniform float nlight;",   // sources du fond : (x, y, profondeur, rayon) en pixels CSS ; (couleur, intensité)
       "float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }",
@@ -444,7 +444,7 @@
       "  vec2 g = vec2(hR - hL, hD - hU) / (2.0 * e);",
       // Impuretés : le verre n'est pas uniforme. Un champ de bruit lié à la carte (il la suit quand on
       // défile) dévie la surface par endroits, trouble le verre par nuages et dédouble l'image.
-      "  vec2 q = lp + b.zw * 0.37;",
+      "  vec2 q = (lp + b.zw * 0.37) / gImpS + vec2(t * 1.6, t * 1.1) / gImpS;",   // grosses impuretés : plus lentes
       "  float cloud = smoothstep(0.38, 0.72, n(q * 0.035 + 9.0));",
       "  g += ((vec2(n(q * 0.07 + 3.1), n(q * 0.07 + 17.7)) - 0.5) * 1.1 + (vec2(n(q * 0.21 + 5.3), n(q * 0.21 + 11.9)) - 0.5) * 0.7) * gImp * 0.6;",
       "  vec3 N = normalize(vec3(-g, 1.0));",
@@ -558,7 +558,7 @@
       gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       this.u = {};
       for (const name of ["res", "t", "scroll", "oct", "warp", "size", "fusion", "lace", "ncol", "px", "cols", "cards", "crad", "ncard",
-        "gZoom", "gBezel", "gDisp", "gFrost", "gSmoke", "gImp", "smokeCol", "gLight", "gRound", "gThick", "gReflect", "gCounter", "gCw", "gRough", "lPos", "lCol", "nlight"]) this.u[name] = gl.getUniformLocation(prog, name);
+        "gZoom", "gBezel", "gDisp", "gFrost", "gSmoke", "gImp", "gImpS", "smokeCol", "gLight", "gRound", "gThick", "gReflect", "gCounter", "gCw", "gRough", "lPos", "lCol", "nlight"]) this.u[name] = gl.getUniformLocation(prog, name);
       Object.assign(this, { canvas, gl });
       this.onResize = () => {
         const k = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);  // pleine résolution (2× max) : les bords arrondis restent nets
@@ -614,7 +614,7 @@
       gl.uniform3fv(u.cols, rgb);
       gl.uniform4fv(u.cards, boxes); gl.uniform1fv(u.crad, radii); gl.uniform1f(u.ncard, n);
       gl.uniform1f(u.gZoom, glass.zoom); gl.uniform1f(u.gBezel, glass.bezel); gl.uniform1f(u.gDisp, glass.diffraction);
-      gl.uniform1f(u.gFrost, glass.frost); gl.uniform1f(u.gSmoke, glass.smoke); gl.uniform1f(u.gImp, glass.impurity);
+      gl.uniform1f(u.gFrost, glass.frost); gl.uniform1f(u.gSmoke, glass.smoke); gl.uniform1f(u.gImp, glass.impurity); gl.uniform1f(u.gImpS, glass.impsize);
       { const v = parseInt(glass.smokeColor.slice(1), 16); gl.uniform3f(u.smokeCol, (v >> 16 & 255) / 255, (v >> 8 & 255) / 255, (v & 255) / 255); } gl.uniform1f(u.gLight, glass.light); gl.uniform1f(u.gRound, glass.round);
       gl.uniform1f(u.gThick, glass.thick); gl.uniform1f(u.gReflect, glass.reflect); gl.uniform1f(u.gCounter, glass.counter);
       gl.uniform1f(u.gCw, glass.cwidth); gl.uniform1f(u.gRough, glass.crough);
