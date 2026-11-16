@@ -9,7 +9,7 @@
      Three.js        scène 3D en fond du style Argile (pâte à modeler)
    Sans bibliothèque : la réfraction du style Verre (filtres SVG calculés ici).
 
-   API : setSkin(skin) · leave(li, action) → Promise · celebrate(kind, rect) · enter(view)
+   API : setSkin(skin) · setGlass(réglages) · leave(li, action) → Promise · celebrate(kind, rect) · enter(view)
    ========================================================================= */
 (function () {
   "use strict";
@@ -38,6 +38,18 @@
 
   let skin = "carnet";
   let scene = null;          // scène 3D active (Argile)
+
+  // Réglages du style Verre (atelier du verre, dans app.js) ; valeurs par défaut = réglages d'origine.
+  const glass = {
+    colors: ["#293dd9", "#8040f2", "#ff5c8c", "#ff8f4d", "#1ac7cc"],
+    complexity: 3, size: 1, fusion: 0.24, lace: 0.4, speed: 1,
+    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, light: 1
+  };
+  function setGlass(p) {
+    Object.assign(glass, p);
+    document.documentElement.style.setProperty("--frost-tint", "rgba(255,255,255," + (glass.frost * 0.16).toFixed(3) + ")");
+    liquid.rebuild();
+  }
 
   /* ---------- Style ---------------------------------------------------- */
   function setSkin(next) {
@@ -179,7 +191,7 @@
   const SVG_NS = "http://www.w3.org/2000/svg";
   const liquid = {
     supported: (() => { try { return CSS.supports("backdrop-filter", "url(#x)") && /Chrome\//.test(navigator.userAgent); } catch (e) { return false; } })(),
-    filters: new Map(), defs: null, observer: null, frame: 0, on: false,
+    filters: new Map(), defs: null, observer: null, frame: 0, on: false, version: 0, rebuildTimer: 0,
 
     // Carte de déformation : rouge = décalage horizontal, vert = décalage vertical (128 = aucun).
     // Deux effets s'additionnent, comme dans une bille de verre soufflé aplatie :
@@ -212,7 +224,7 @@
           px[i] = 128 + Math.max(-1, Math.min(1, dx / range)) * 127;
           px[i + 1] = 128 + Math.max(-1, Math.min(1, dy / range)) * 127;
           px[i + 2] = 128; px[i + 3] = 255;
-          const glow = depth < rim ? Math.pow(1 - Math.max(depth, 0) / rim, 1.6) * (oy < 0 ? 1 : 0.55) * (0.4 + 0.6 * Math.abs(ny)) : 0;
+          const glow = depth < rim ? Math.min(1, Math.pow(1 - Math.max(depth, 0) / rim, 1.6) * (oy < 0 ? 1 : 0.55) * (0.4 + 0.6 * Math.abs(ny)) * glass.light) : 0;
           lpx[i] = lpx[i + 1] = lpx[i + 2] = 255; lpx[i + 3] = glow * 255;
         }
       }
@@ -224,7 +236,7 @@
     //  2. la lumière des bords : le fond derrière la carte, adouci, saturé et éclairci, posé sur le masque
     //     de lumière. Le halo prend donc la couleur de ce qui passe derrière (rouge derrière = halo rouge).
     filter(w, h, r, lens) {
-      const id = "lg-" + w + "-" + h + "-" + r + (lens ? "-l" : "");
+      const id = "lg" + this.version + "-" + w + "-" + h + "-" + r + (lens ? "-l" : "");
       if (this.filters.has(id)) return id;
       if (!this.defs) {
         const svg = document.createElementNS(SVG_NS, "svg");
@@ -236,8 +248,8 @@
       }
       // Bombé proportionné : fort sur les grandes cartes, discret sur les petits boutons (sinon l'image se déchire).
       const small = Math.min(w, h) < 90 || w < 200;
-      const bezel = Math.max(8, Math.min(lens && !small ? 32 : 14, Math.min(w, h) * (small ? 0.22 : 0.45)));
-      const zoom = lens && !small ? 1.12 : 1;
+      const bezel = Math.max(4, Math.min(lens && !small ? 32 : 14, Math.min(w, h) * (small ? 0.22 : 0.45)) * glass.bezel);
+      const zoom = lens && !small ? glass.zoom : 1;
       const range = bezel + (Math.max(w, h) / 2) * (1 - 1 / zoom);
       const scale = range * 2;
       const channel = (n, s) => '<feDisplacementMap in="SourceGraphic" in2="map" scale="' + s.toFixed(1) + '" xChannelSelector="R" yChannelSelector="G" result="d' + n + '"/>' +
@@ -249,7 +261,7 @@
       const img = (href, result) => '<feImage href="' + href + '" x="0" y="0" width="' + w + '" height="' + h + '" preserveAspectRatio="none" result="' + result + '"/>';
       const lift = '<feFuncR type="linear" slope="1.5" intercept="0.1"/><feFuncG type="linear" slope="1.5" intercept="0.1"/><feFuncB type="linear" slope="1.5" intercept="0.1"/>';
       f.innerHTML = img(m.map, "map") +
-        channel(0, scale) + channel(1, scale * 0.92) + channel(2, scale * 0.84) +
+        channel(0, scale) + channel(1, scale * (1 - 0.16 * glass.diffraction)) + channel(2, scale * (1 - 0.32 * glass.diffraction)) +
         '<feBlend in="c0" in2="c1" mode="screen" result="rg"/><feBlend in="rg" in2="c2" mode="screen" result="rgb"/>' +
         '<feGaussianBlur in="rgb" stdDeviation="0.5" result="clear"/>' +
         img(m.light, "lightmask") +
@@ -276,10 +288,22 @@
         const id = this.filter(w, h, r, !bar);
         if (el.dataset.lg === id) return;
         el.dataset.lg = id;
-        el.style.backdropFilter = el.style.webkitBackdropFilter = "url(#" + id + ")" + (bar ? " blur(5px)" : "") + " saturate(1.35)";
+        const blur = (bar ? 5 : 0) + glass.frost * 14;   // « verre fumé » de l'atelier : du flou en plus
+        el.style.backdropFilter = el.style.webkitBackdropFilter = "url(#" + id + ")" + (blur ? " blur(" + blur.toFixed(1) + "px)" : "") + " saturate(1.35)";
       });
     },
     schedule() { if (!this.frame) this.frame = requestAnimationFrame(() => this.apply()); },
+    // Les réglages ont changé : on jette les filtres et on les recalcule (regroupé pendant qu'on glisse un curseur).
+    rebuild() {
+      clearTimeout(this.rebuildTimer);
+      this.rebuildTimer = setTimeout(() => {
+        this.version++;
+        this.filters.clear();
+        if (this.defs) this.defs.textContent = "";
+        document.querySelectorAll("[data-lg]").forEach((el) => delete el.dataset.lg);
+        this.schedule();
+      }, 90);
+    },
     start() {
       if (!this.supported || this.on) return;
       this.on = true;
@@ -306,86 +330,100 @@
    * Calculé par la carte graphique (WebGL, sans bibliothèque), en résolution réduite et à 20 images/s
    * pour ménager la batterie. Si WebGL manque, les disques de app.css restent en fond.          */
   const fluid = {
-    canvas: null, gl: null, prog: null, raf: 0, last: 0, start0: 0,
+    canvas: null, gl: null, on: false, raf: 0, last: 0, time: 0,
     FRAG: [
       "precision highp float;",
-      "uniform vec2 res; uniform float t; uniform float scroll;",
+      "uniform vec2 res; uniform float t, scroll, oct, warp, size, fusion, lace, ncol;",
+      "uniform vec3 cols[8];",
       "float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }",
       "float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);",
       "  return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }",
-      // 3 niveaux de détail seulement : de grandes formes douces, sans petites volutes
-      "float fbm(vec2 p){ float v = 0.0, a = 0.55; for (int i = 0; i < 3; i++){ v += a*n(p); p = p*1.9 + 1.7; a *= 0.45; } return v; }",
-      "vec3 pal(float i){ float k = mod(i, 5.0);",
-      "  if (k < 1.0) return vec3(0.16, 0.24, 0.86);",     // bleu
-      "  if (k < 2.0) return vec3(0.50, 0.25, 0.95);",     // violet
-      "  if (k < 3.0) return vec3(1.00, 0.36, 0.55);",     // corail
-      "  if (k < 4.0) return vec3(1.00, 0.56, 0.30);",     // orange
-      "  return vec3(0.10, 0.78, 0.80); }",                // turquoise
+      // oct niveaux de détail : peu = grandes formes douces, beaucoup = volutes
+      "float fbm(vec2 p){ float v = 0.0, a = 0.55; for (int i = 0; i < 6; i++){ if (float(i) >= oct) break; v += a*n(p); p = p*1.9 + 1.7; a *= 0.45; } return v; }",
+      "vec3 pal(float i){ float k = mod(i, ncol); vec3 c = cols[0];",
+      "  for (int j = 0; j < 8; j++) if (abs(float(j) - k) < 0.5) c = cols[j];",
+      "  return c; }",
       "void main(){",
-      "  vec2 p = (gl_FragCoord.xy - 0.5*res) / res.y * 0.9 + vec2(0.0, scroll * 0.25);",
+      "  vec2 p = (gl_FragCoord.xy - 0.5*res) / res.y * 0.9 / size + vec2(0.0, scroll * 0.25);",
       "  float s = t * 0.025;",
-      // déformation en cascade (domain warping) : c'est ce qui fait les volutes de peinture
+      // déformation en cascade (domain warping) : ce sont les volutes de la peinture versée
       "  vec2 q = vec2(fbm(p + vec2(0.0, s)), fbm(p + vec2(5.2, 1.3) - s));",
-      "  vec2 r = vec2(fbm(p + 1.4*q + vec2(1.7, 9.2) + s*1.4), fbm(p + 1.4*q + vec2(8.3, 2.8) - s));",
-      "  float v = fbm(p + 1.5*r) * 2.6 + r.x * 1.0;",
-      "  float k = v * 1.8 + p.x * 1.6 - p.y * 2.0;",                        // le long des vagues + une diagonale : plusieurs couleurs à l'écran
+      "  vec2 r = vec2(fbm(p + warp*q + vec2(1.7, 9.2) + s*1.4), fbm(p + warp*q + vec2(8.3, 2.8) - s));",
+      "  float v = fbm(p + warp*1.07*r) * 2.6 + r.x;",
+      "  float k = v * 1.8 + p.x * 1.6 - p.y * 2.0;",                       // le long des vagues + une diagonale : plusieurs couleurs à l'écran
       "  float i = floor(k), fr = fract(k);",
-      "  vec3 c = mix(pal(i), pal(i + 1.0), smoothstep(0.38, 0.62, fr));",      // couleurs franches, passage court mais doux
-      "  float lace = smoothstep(0.03, 0.0, abs(fr - 0.5)) * 0.4;",             // fin filet clair à chaque frontière : l'effet de coulée
-      "  c = mix(c, vec3(1.0, 0.96, 0.92), lace);",
-      "  c *= 0.94 + 0.08 * fbm(p * 1.5 + r);",                                // légère matière
+      "  vec3 c = mix(pal(i), pal(i + 1.0), smoothstep(0.5 - fusion*0.5, 0.5 + fusion*0.5, fr));",   // fusion : franc → fondu
+      "  c = mix(c, vec3(1.0, 0.96, 0.92), smoothstep(0.03, 0.0, abs(fr - 0.5)) * lace);",           // filet clair à chaque frontière
+      "  c *= 0.94 + 0.08 * fbm(p * 1.5 + r);",                               // légère matière
       "  gl_FragColor = vec4(c, 1.0);",
       "}"
     ].join("\n"),
+    // Le contexte graphique est créé une seule fois ; ensuite on met simplement en pause ou on reprend.
     start() {
-      if (reduced || this.gl) return;
+      if (reduced || this.on) return;
+      if (!this.gl && !this.init()) return;
+      this.on = true;
+      addEventListener("resize", this.onResize);
+      document.addEventListener("visibilitychange", this.onVisible);
+      this.onResize();
+      this.canvas.hidden = false;
+      document.documentElement.classList.add("fx-fluid");
+      this.last = performance.now();
+      this.raf = requestAnimationFrame((now) => this.draw(now));
+    },
+    init() {
       const canvas = document.getElementById("fluid");
       const gl = canvas && canvas.getContext("webgl", { antialias: false, alpha: false, powerPreference: "low-power" });
-      if (!gl) return;
+      if (!gl) return false;
       const shader = (type, src) => { const sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh); return sh; };
       const prog = gl.createProgram();
       gl.attachShader(prog, shader(gl.VERTEX_SHADER, "attribute vec2 a; void main(){ gl_Position = vec4(a, 0.0, 1.0); }"));
       gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, this.FRAG));
       gl.linkProgram(prog);
-      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return false;
       gl.useProgram(prog);
       gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
       gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
       const loc = gl.getAttribLocation(prog, "a");
       gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-      Object.assign(this, { canvas, gl, prog, start0: performance.now() });
-      this.u = { res: gl.getUniformLocation(prog, "res"), t: gl.getUniformLocation(prog, "t"), scroll: gl.getUniformLocation(prog, "scroll") };
+      this.u = {};
+      for (const name of ["res", "t", "scroll", "oct", "warp", "size", "fusion", "lace", "ncol", "cols"]) this.u[name] = gl.getUniformLocation(prog, name);
+      Object.assign(this, { canvas, gl });
       this.onResize = () => {
         const k = 0.65;  // résolution réduite : les courbes restent douces, le téléphone respire
         canvas.width = Math.max(1, Math.round(innerWidth * k)); canvas.height = Math.max(1, Math.round(innerHeight * k));
         gl.viewport(0, 0, canvas.width, canvas.height);
       };
-      this.onVisible = () => { if (document.hidden) cancelAnimationFrame(this.raf); else this.raf = requestAnimationFrame((now) => this.draw(now)); };
-      addEventListener("resize", this.onResize);
-      document.addEventListener("visibilitychange", this.onVisible);
-      this.onResize();
-      canvas.hidden = false;
-      document.documentElement.classList.add("fx-fluid");
-      this.raf = requestAnimationFrame((now) => this.draw(now));
+      this.onVisible = () => { if (document.hidden) cancelAnimationFrame(this.raf); else { this.last = performance.now(); this.raf = requestAnimationFrame((now) => this.draw(now)); } };
+      return true;
     },
     draw(now) {
       this.raf = requestAnimationFrame((n) => this.draw(n));
       if (now - this.last < 50) return;   // 20 images par seconde suffisent pour un mouvement aussi lent
+      this.time += ((now - this.last) / 1000) * glass.speed;   // la vitesse de l'atelier (0 = arrêt)
       this.last = now;
-      const gl = this.gl;
-      gl.uniform2f(this.u.res, this.canvas.width, this.canvas.height);
-      gl.uniform1f(this.u.t, (now - this.start0) / 1000);
-      gl.uniform1f(this.u.scroll, scrollY / innerHeight);
+      const gl = this.gl, u = this.u, cols = glass.colors.slice(0, 8);
+      const rgb = new Float32Array(24);
+      cols.forEach((hex, i) => { const v = parseInt(hex.slice(1), 16); rgb.set([(v >> 16 & 255) / 255, (v >> 8 & 255) / 255, (v & 255) / 255], i * 3); });
+      gl.uniform2f(u.res, this.canvas.width, this.canvas.height);
+      gl.uniform1f(u.t, this.time);
+      gl.uniform1f(u.scroll, scrollY / innerHeight);
+      gl.uniform1f(u.oct, glass.complexity);
+      gl.uniform1f(u.warp, 0.5 + 0.3 * glass.complexity);
+      gl.uniform1f(u.size, glass.size);
+      gl.uniform1f(u.fusion, Math.max(0.02, glass.fusion));
+      gl.uniform1f(u.lace, glass.lace);
+      gl.uniform1f(u.ncol, cols.length);
+      gl.uniform3fv(u.cols, rgb);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     },
     stop() {
-      if (!this.gl) return;
+      if (!this.on) return;
+      this.on = false;
       cancelAnimationFrame(this.raf);
       removeEventListener("resize", this.onResize);
       document.removeEventListener("visibilitychange", this.onVisible);
-      const lose = this.gl.getExtension("WEBGL_lose_context"); if (lose) lose.loseContext();
       this.canvas.hidden = true;
-      this.gl = null;
       document.documentElement.classList.remove("fx-fluid");
     }
   };
@@ -532,5 +570,5 @@
     " return 42.0*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3))); }"
   ].join("\n");
 
-  window.CoursesFX = { setSkin, leave, celebrate, enter };
+  window.CoursesFX = { setSkin, setGlass, leave, celebrate, enter };
 })();

@@ -292,6 +292,40 @@ body.sheet-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
 .swatch.argile { background: radial-gradient(circle at 30% 40%, #ffb38a 0 16%, transparent 17%), radial-gradient(circle at 68% 58%, #b9a6ff 0 20%, transparent 21%), #efe7ff; }
 @media (max-width: 380px) { .skins { grid-template-columns: 1fr; } .swatch { height: 52px; } }
 
+/* Atelier du verre : panneau en bas ; le haut reste transparent pour voir les vraies cartes et la carte test. */
+.lab {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 35; height: min(68vh, 620px);
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 0 max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px));
+  background: linear-gradient(to bottom, rgba(10,15,44,0), rgba(10,15,44,.6) 70px);   /* simple fond, pas de flou : la carte test voit le décor */
+}
+.lab-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.lab-head h2 { font-family: var(--font-display); margin: 0; font-size: 1.3rem; }
+.lab-sample { flex: none; }
+.lab-body {
+  flex: 1; min-height: 0; overflow-y: auto; display: grid; align-content: start; gap: 14px;
+  margin: 0 calc(-1 * max(16px, env(safe-area-inset-left, 0px))); padding: 16px max(16px, env(safe-area-inset-left, 0px)) calc(20px + env(safe-area-inset-bottom, 0px));
+  background: rgba(10,15,44,.9); border-radius: 22px 22px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,.3);
+  -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
+}
+.lab-body h3 { margin: 4px 0 0; font-family: var(--font-display); font-size: 1rem; }
+.lab-row { display: grid; gap: 4px; font-size: .9rem; }
+.lab-row span { display: flex; justify-content: space-between; gap: 10px; }
+.lab-row output { color: var(--muted); font-variant-numeric: tabular-nums; }
+.lab input[type="range"] { min-height: 0; padding: 0; border: 0; background: none; width: 100%; height: 28px; accent-color: var(--hl); }
+.lab-colors { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.lab-color { position: relative; }
+.lab-color input[type="color"] {
+  width: 46px; height: 46px; min-height: 0; padding: 0; border: 2px solid rgba(255,255,255,.6); border-radius: 50%; cursor: pointer; background: none;
+}
+.lab-color input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.lab-color input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 50%; }
+.lab-color button {
+  position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; border-radius: 50%; border: 0; cursor: pointer;
+  background: #fff; color: #0a0f2c; font-weight: 700; line-height: 22px; padding: 0; font-size: .85rem;
+}
+.lab-color button:disabled { display: none; }
+
 /* 8. Style Verre (sombre) -----------------------------------------------
    Inspiré du Liquid Glass d'Apple : des plaques presque claires, sans effet fumée.
    - La réfraction (bords qui courbent l'image, franges rouge/vert/bleu) est ajoutée par
@@ -303,7 +337,8 @@ body.sheet-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
   --bg: #0a0f2c; --card: rgba(255,255,255,.06); --ink: #ffffff; --muted: rgba(255,255,255,.78);
   --line: rgba(255,255,255,.18); --hl: #8ff5e8; --hl-ink: #08122e; --ok: #8ff5c0; --bad: #ff9aa8; --warn: #ffd58a;
   --radius: 22px; --font-display: "Outfit", "Atkinson Hyperlegible", system-ui, sans-serif;
-  --glass-fill: linear-gradient(150deg, rgba(255,255,255,.07), rgba(255,255,255,0) 40%);   /* verre clair : juste un reflet en haut à gauche */
+  --glass-fill: linear-gradient(150deg, rgba(255,255,255,.07), rgba(255,255,255,0) 40%),   /* verre clair : juste un reflet en haut à gauche */
+                linear-gradient(var(--frost-tint, transparent), var(--frost-tint, transparent));  /* « verre fumé » réglé dans l'atelier */
   --glass-shine: radial-gradient(120px circle at var(--mx, 15%) var(--my, -30%), rgba(255,255,255,.16), transparent 70%);
   /* Volume de verre soufflé : lumière douce sur le haut du bombé, lueur sur le bas, ombre sous le bord, sans arête */
   --glass-light: inset 0 2px 3px rgba(255,255,255,.4), inset 0 10px 16px -8px rgba(255,255,255,.28),

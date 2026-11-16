@@ -57,8 +57,15 @@
    * dates[id] : "AAAA-MM-JJ" ou "none" (ne périme pas)
    * custom    : articles ajoutés {id, name, aisle}                                              */
   const KEY = "courses-v1";
-  const SKINS = { carnet: "#0e0e10", verre: "#170f3a", argile: "#efe7ff" };
-  const state = { marks: {}, dates: {}, custom: [], tab: "courses", skin: "carnet", v: 3 };
+  const SKINS = { carnet: "#0e0e10", verre: "#0a0f2c", argile: "#efe7ff" };
+  // Atelier du verre : réglages d'origine du style Verre (fond fluide et verre des cartes).
+  const GLASS_DEFAULTS = {
+    colors: ["#293dd9", "#8040f2", "#ff5c8c", "#ff8f4d", "#1ac7cc"],
+    complexity: 3, size: 1, fusion: 0.24, lace: 0.4, speed: 1,
+    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, light: 1
+  };
+  const copyGlass = (g) => ({ ...g, colors: g.colors.slice() });
+  const state = { marks: {}, dates: {}, custom: [], tab: "courses", skin: "carnet", glass: copyGlass(GLASS_DEFAULTS), v: 3 };
 
   function load() {
     let saved = null;
@@ -72,13 +79,22 @@
       marks: isObj(d.marks) ? d.marks : {}, dates: isObj(d.dates) ? d.dates : {},
       custom: Array.isArray(d.custom) ? d.custom : [],
       tab: /^(courses|ranger|frigo)$/.test(d.tab) ? d.tab : "courses",
-      skin: SKINS[d.skin] ? d.skin : "carnet", v: 3
+      skin: SKINS[d.skin] ? d.skin : "carnet", glass: normalizeGlass(d.glass), v: 3
     };
     // Avant les onglets (sans « v »), « Pas besoin » voulait dire « j'en ai déjà » : c'est du stock.
     if (!d.v) for (const k in out.marks) if (out.marks[k] === "skip") out.marks[k] = "got";
     return out;
   }
   function isObj(x) { return x && typeof x === "object" && !Array.isArray(x); }
+  // Réglages du verre : chaque valeur est bornée ; ce qui manque reprend la valeur d'origine.
+  function normalizeGlass(g) {
+    const out = copyGlass(GLASS_DEFAULTS);
+    if (!isObj(g)) return out;
+    const colors = Array.isArray(g.colors) ? g.colors.filter((c) => /^#[0-9a-f]{6}$/i.test(c)).slice(0, 8) : [];
+    if (colors.length >= 2) out.colors = colors;
+    for (const c of GLASS_SLIDERS) if (typeof g[c.key] === "number") out[c.key] = Math.min(c.max, Math.max(c.min, g[c.key]));
+    return out;
+  }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
     syncReminders();
@@ -707,6 +723,9 @@
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute("content", SKINS[state.skin]);
     document.querySelectorAll("[data-pick]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.pick === state.skin)));
+    $("labBtn").hidden = state.skin !== "verre";
+    if (state.skin !== "verre") $("lab").hidden = true;
+    fx("setGlass", state.glass);
     fx("setSkin", state.skin);
   }
   $("skinBtn").addEventListener("click", () => { $("picker").hidden = false; });
@@ -715,6 +734,61 @@
     const b = e.target.closest("[data-pick]");
     if (b) { state.skin = b.dataset.pick; save(); applySkin(); }
   });
+
+  /* Atelier du verre : on règle le fond et le verre, et on voit le résultat en direct
+     (la carte test en haut du panneau, et les vraies cartes au-dessus). */
+  const pct = (v) => Math.round(v * 100) + " %";
+  const GLASS_SLIDERS = [
+    { group: "labBg", key: "complexity", label: "Complexité des vagues", min: 1, max: 5, step: 1, show: (v) => ["très douces", "douces", "moyennes", "riches", "volutes"][v - 1] },
+    { group: "labBg", key: "size", label: "Taille des vagues", min: 0.5, max: 2, step: 0.05, show: (v) => "×" + v.toFixed(2) },
+    { group: "labBg", key: "fusion", label: "Fusion des couleurs", min: 0, max: 1, step: 0.02, show: (v) => (v < 0.05 ? "franche" : pct(v)) },
+    { group: "labBg", key: "lace", label: "Filets clairs", min: 0, max: 1, step: 0.02, show: (v) => (v ? pct(v) : "aucun") },
+    { group: "labBg", key: "speed", label: "Vitesse", min: 0, max: 4, step: 0.1, show: (v) => (v ? "×" + v.toFixed(1) : "arrêt") },
+    { group: "labGlass", key: "zoom", label: "Loupe", min: 1, max: 1.4, step: 0.01, show: (v) => (v === 1 ? "aucune" : "×" + v.toFixed(2)) },
+    { group: "labGlass", key: "bezel", label: "Bombé des bords", min: 0, max: 2, step: 0.05, show: (v) => (v ? pct(v) : "plat") },
+    { group: "labGlass", key: "diffraction", label: "Diffraction (arc-en-ciel)", min: 0, max: 1, step: 0.02, show: (v) => (v ? pct(v) : "aucune") },
+    { group: "labGlass", key: "frost", label: "Verre fumé", min: 0, max: 1, step: 0.02, show: (v) => (v ? pct(v) : "clair") },
+    { group: "labGlass", key: "light", label: "Lumière des bords", min: 0, max: 2, step: 0.05, show: (v) => (v ? pct(v) : "éteinte") }
+  ];
+  const EXTRA_COLORS = ["#ffd25e", "#5fd6a8", "#ff4f6d", "#4cc9ff", "#c7f464", "#ffffff", "#ff9ff3", "#2e2a6b"];
+  for (const group of ["labBg", "labGlass"]) {
+    $(group).innerHTML = GLASS_SLIDERS.filter((c) => c.group === group).map((c) =>
+      '<label class="lab-row" for="lab-' + c.key + '"><span>' + c.label + ' <output id="labOut-' + c.key + '"></output></span>' +
+      '<input type="range" id="lab-' + c.key + '" data-key="' + c.key + '" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '"></label>').join("");
+  }
+  function drawLab() {
+    const g = state.glass, n = g.colors.length;
+    $("labColors").innerHTML = g.colors.map((c, i) =>
+      '<span class="lab-color"><input type="color" value="' + c + '" data-ci="' + i + '" aria-label="Couleur ' + (i + 1) + '">' +
+      '<button type="button" data-rm="' + i + '" aria-label="Retirer la couleur ' + (i + 1) + '"' + (n <= 2 ? " disabled" : "") + ">×</button></span>").join("") +
+      (n < 8 ? '<button class="pill" type="button" data-add>+ Couleur</button>' : "");
+    for (const c of GLASS_SLIDERS) { $("lab-" + c.key).value = g[c.key]; $("labOut-" + c.key).textContent = c.show(g[c.key]); }
+  }
+  let labSaveTimer = 0;
+  function pushGlass() {
+    fx("setGlass", state.glass);
+    clearTimeout(labSaveTimer); labSaveTimer = setTimeout(save, 300);
+  }
+  $("lab").addEventListener("input", (e) => {
+    const t = e.target;
+    if (t.dataset.key) {
+      const c = GLASS_SLIDERS.find((x) => x.key === t.dataset.key);
+      state.glass[c.key] = +t.value;
+      $("labOut-" + c.key).textContent = c.show(+t.value);
+    } else if (t.dataset.ci) state.glass.colors[+t.dataset.ci] = t.value;
+    else return;
+    pushGlass();
+  });
+  $("lab").addEventListener("click", (e) => {
+    const g = state.glass;
+    if (e.target.closest("[data-add]")) g.colors.push(EXTRA_COLORS.find((c) => !g.colors.includes(c)) || "#ffffff");
+    else if (e.target.closest("[data-rm]")) g.colors.splice(+e.target.closest("[data-rm]").dataset.rm, 1);
+    else if (e.target.closest("#labReset")) state.glass = copyGlass(GLASS_DEFAULTS);
+    else if (e.target.closest("#labClose")) { $("lab").hidden = true; return; }
+    else return;
+    drawLab(); pushGlass();
+  });
+  $("labBtn").addEventListener("click", () => { $("picker").hidden = true; drawLab(); $("lab").hidden = false; });
 
   /* 13. Démarrage ---------------------------------------------------------------------------- */
   let wakeLock = null;

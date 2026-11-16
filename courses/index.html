@@ -123,7 +123,27 @@
       <button class="skin" type="button" data-pick="verre"><span class="swatch verre"></span><b>Verre</b><small>Verre clair qui réfracte, façon Apple.</small></button>
       <button class="skin" type="button" data-pick="argile"><span class="swatch argile"></span><b>Argile</b><small>Pâte à modeler bombée et colorée.</small></button>
     </div>
+    <button class="btn ghost" id="labBtn" type="button" hidden>Personnaliser le verre</button>
     <button class="btn" type="button" data-close-picker>C'est bon</button>
+  </div>
+</div>
+
+<!-- Atelier du verre : réglages du style Verre, appliqués en direct -->
+<div class="lab" id="lab" hidden role="dialog" aria-labelledby="labTitle">
+  <div class="lab-head">
+    <h2 id="labTitle">Atelier du verre</h2>
+    <button class="pill" id="labClose" type="button">Terminé</button>
+  </div>
+  <ul class="rows lab-sample" aria-hidden="true">
+    <li><span class="tap"><span class="box"></span><span class="label"><span class="name">Carte test</span><span class="note">Règle, et regarde le verre en direct</span></span></span></li>
+  </ul>
+  <div class="lab-body">
+    <h3>Fond</h3>
+    <div class="lab-colors" id="labColors"></div>
+    <div id="labBg"></div>
+    <h3>Verre des cartes</h3>
+    <div id="labGlass"></div>
+    <button class="btn ghost" id="labReset" type="button">Revenir aux réglages d'origine</button>
   </div>
 </div>
 
