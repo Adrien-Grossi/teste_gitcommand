@@ -48,7 +48,6 @@
   function setGlass(p) {
     Object.assign(glass, p);
     document.documentElement.style.setProperty("--frost-tint", "rgba(255,255,255," + (glass.frost * 0.16).toFixed(3) + ")");
-    document.documentElement.style.setProperty("--iris", (glass.diffraction * 0.85).toFixed(2));   // liseré arc-en-ciel (app.css)
     liquid.rebuild();
   }
 
@@ -200,13 +199,16 @@
     //    puis la courbure s'adoucit vers l'intérieur (pente du profil), sans arête ;
     //  - le grossissement (zoom > 1) : tout l'intérieur montre une zone plus petite, donc agrandie.
     // range = décalage maximal en pixels, qui devient l'échelle du filtre.
-    // Renvoie aussi le masque de lumière : où la carte s'éclaire (bord haut surtout, bord bas un peu).
+    // Renvoie aussi le masque de lumière, en trois couches (une par couleur) : la lumière du fond se concentre
+    // en une bande le long de la courbe du bombé (une caustique), et chaque couleur s'y place à une profondeur
+    // un peu différente (le rouge plus près du bord, le bleu plus à l'intérieur) : c'est la dispersion.
     maps(w, h, r, bezel, zoom, range) {
       const c = document.createElement("canvas"); c.width = w; c.height = h;
       const g = c.getContext("2d"), img = g.createImageData(w, h), px = img.data;
       const lc = document.createElement("canvas"); lc.width = w; lc.height = h;
       const lg = lc.getContext("2d"), limg = lg.createImageData(w, h), lpx = limg.data;
-      const rim = bezel * 1.7;   // le halo coloré déborde un peu plus loin que le bombé
+      const peak = bezel * 0.32, width = bezel * 0.16, spread = glass.diffraction * 0.75;   // bandes fines, dans la courbe du bord
+      const band = (d, p) => Math.exp(-(((d - p) / width) ** 2));
       const shrink = 1 - 1 / zoom;
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
@@ -225,8 +227,13 @@
           px[i] = 128 + Math.max(-1, Math.min(1, dx / range)) * 127;
           px[i + 1] = 128 + Math.max(-1, Math.min(1, dy / range)) * 127;
           px[i + 2] = 128; px[i + 3] = 255;
-          const glow = depth < rim ? Math.min(1, Math.pow(1 - Math.max(depth, 0) / rim, 1.2) * (oy < 0 ? 1 : 0.6) * (0.45 + 0.55 * Math.abs(ny)) * glass.light) : 0;
-          lpx[i] = lpx[i + 1] = lpx[i + 2] = 255; lpx[i + 3] = glow * 255;
+          // plus de lumière sur le haut (côté éclairé), moins sur le bas, peu sur les côtés
+          const facing = (oy < 0 ? 1 : 0.6) * (0.45 + 0.55 * Math.abs(ny)) * glass.light;
+          const d = Math.max(depth, 0);
+          lpx[i] = Math.min(1, band(d, peak * (1 - spread)) * facing) * 255;       // rouge
+          lpx[i + 1] = Math.min(1, band(d, peak) * facing) * 255;                  // vert
+          lpx[i + 2] = Math.min(1, band(d, peak * (1 + spread)) * facing) * 255;   // bleu
+          lpx[i + 3] = 255;
         }
       }
       g.putImageData(img, 0, 0); lg.putImageData(limg, 0, 0);
@@ -247,8 +254,8 @@
         svg.appendChild(this.defs);
         document.body.appendChild(svg);
       }
-      // Bombé proportionné : fort sur les grandes cartes, discret sur les petits boutons (sinon l'image se déchire).
-      const small = Math.min(w, h) < 90 || w < 200;
+      // Bombé proportionné : fort sur les cartes, discret sur les éléments étroits (pavé, pastilles), sinon l'image se déchire.
+      const small = w < 200 || h < 44;
       const bezel = Math.max(4, Math.min(lens && !small ? 32 : 14, Math.min(w, h) * (small ? 0.22 : 0.45)) * glass.bezel);
       const zoom = lens && !small ? glass.zoom : 1;
       const range = bezel + (Math.max(w, h) / 2) * (1 - 1 / zoom);
@@ -271,7 +278,7 @@
         '<feGaussianBlur in="SourceGraphic" stdDeviation="7" result="soft"/>' +
         '<feColorMatrix in="soft" type="saturate" values="2.6" result="sat"/>' +
         '<feComponentTransfer in="sat" result="bright">' + lift + '</feComponentTransfer>' +
-        '<feComposite in="bright" in2="lightmask" operator="in" result="glow"/>' +
+        '<feBlend in="bright" in2="lightmask" mode="multiply" result="glow"/>' +   // couleur du fond × bande de chaque couleur
         '<feBlend in="glow" in2="clear" mode="screen"/>';
       this.defs.appendChild(f);
       this.filters.set(id, f);

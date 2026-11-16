@@ -384,15 +384,6 @@ body.lab-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
   background: var(--glass-shine), var(--glass-fill); border: 0; box-shadow: var(--glass-light);
   -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost);
 }
-/* Irisation : la lumière décomposée dans l'épaisseur du bombé, en fin liseré arc-en-ciel flou.
-   Son intensité (--iris) suit le réglage « Diffraction » de l'atelier. */
-[data-skin="verre"] :is(.rows li, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta)::before {
-  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 2px; pointer-events: none;
-  background: conic-gradient(from 200deg, #ff4d7d, #ffcf4d, #4dffa0, #4dd8ff, #8f6bff, #ff4d7d);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
-  filter: blur(1.2px); mix-blend-mode: screen; opacity: var(--iris, .4);
-}
 /* Les reflets du bombé : une tache allongée en haut, une lueur en bas (lumière qui traverse le verre) */
 [data-skin="verre"] :is(.rows li, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta, .tabs, .toast)::after {
   content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
