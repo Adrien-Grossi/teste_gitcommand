@@ -1,7 +1,7 @@
 // Service worker de « Mes courses » :
 // 1. garde l'appli disponible hors ligne (page : réseau d'abord pour les mises à jour, cache sinon) ;
 // 2. affiche les rappels de péremption (2 jours avant, puis le jour où la date est dépassée).
-var CACHE = "courses-v7";
+var CACHE = "courses-v8";
 var FILES = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon-maskable-512.png"];
 var LEAD = 2; // jours d'avance pour le rappel
 
