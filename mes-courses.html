@@ -235,6 +235,23 @@ input, select, textarea {
 @keyframes fill { to { background-size: 100% 100%; } }
 .datebox { cursor: pointer; }
 
+/* L'écran « Dater le stock » tient toujours dans l'écran : rien ne défile, le pavé prend la place restante. */
+.sheet { overflow: hidden; overscroll-behavior: contain; touch-action: manipulation; }
+.sheet-in { height: 100%; min-height: 0; gap: 8px; }
+.sheet-in > * { flex: none; }
+.item-name { font-size: clamp(1.3rem, 6.5vw, 1.9rem); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.item-sub { font-size: .85rem; min-height: 0; }
+#lbCurrent:empty { display: none; }
+.datebox { font-size: clamp(1.8rem, 9vw, 2.4rem); padding: 4px 8px; }
+.preview { font-size: .9rem; line-height: 1.3; min-height: 2.6em; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.mic { min-height: 50px; }
+.sheet-in > .pad { flex: 1 1 auto; min-height: 0; grid-template-rows: repeat(4, minmax(0, 1fr)); }
+.pad button { min-height: 0; font-size: clamp(1.2rem, 5.5vw, 1.6rem); }
+.chips { flex-wrap: nowrap; gap: 6px; }
+.chips .pill { flex: 1 1 0; min-width: 0; padding: 6px 4px; font-size: .82rem; white-space: nowrap; min-height: 40px; }
+.nav { margin-top: 0; }
+.nav .btn { min-height: 50px; }
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
@@ -786,19 +803,19 @@ input, select, textarea {
     if (/\b(stop|termine|arrete|c'est fini)\b/.test(t)) { closeLabeler(); return true; }
     return false;
   }
-  var NO_SR_MSG = "Ce navigateur n'a pas la reconnaissance vocale. Ouvre l'appli par son icône sur l'écran d'accueil, ou ce lien directement dans Chrome (pas depuis l'appli Claude).";
+  var NO_SR_MSG = "Pas de dictée dans ce navigateur. Ouvre l'appli par son icône, ou dans Chrome.";
   var micOk = false;
   function micFail(code) {
     lb.voice = false;
     var m = {
-      "not-allowed": "Chrome refuse le micro à ce site. Touche ⋮ → Paramètres → Paramètres des sites → Micro, autorise adrien-grossi.github.io, puis touche le bouton micro.",
-      "NotAllowedError": "Chrome refuse le micro à ce site. Touche ⋮ → Paramètres → Paramètres des sites → Micro, autorise adrien-grossi.github.io, puis touche le bouton micro.",
-      "service-not-allowed": "La reconnaissance vocale Google est désactivée sur ce téléphone. Vérifie que l'appli Google est installée et activée, puis réessaie.",
-      "audio-capture": "Le micro est occupé par une autre appli, ou introuvable. Ferme-la et touche le bouton micro.",
+      "not-allowed": "Micro refusé : Chrome ⋮ → Paramètres des sites → Micro → autorise ce site.",
+      "NotAllowedError": "Micro refusé : Chrome ⋮ → Paramètres des sites → Micro → autorise ce site.",
+      "service-not-allowed": "Dictée Google désactivée sur le téléphone : active l'appli Google.",
+      "audio-capture": "Micro occupé par une autre appli. Ferme-la et réessaie.",
       "NotFoundError": "Aucun micro trouvé sur cet appareil.",
-      "network": "La dictée a besoin d'internet. Vérifie ta connexion et touche le bouton micro.",
-      "language-not-supported": "Le français n'est pas disponible pour la dictée sur ce téléphone."
-    }[code] || "Le micro n'a pas marché. Touche le bouton micro pour réessayer.";
+      "network": "La dictée a besoin d'internet. Vérifie ta connexion.",
+      "language-not-supported": "Dictée en français indisponible sur ce téléphone."
+    }[code] || "Le micro n'a pas marché. Touche le bouton micro.";
     lb.msg = m + " (code : " + code + ")";
     drawDate();
   }
