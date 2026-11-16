@@ -43,7 +43,7 @@
   const glass = {
     colors: ["#293dd9", "#8040f2", "#ff5c8c", "#ff8f4d", "#1ac7cc"],
     complexity: 3, size: 1, fusion: 0.24, lace: 0.4, speed: 1,
-    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, light: 1, round: 1, thick: 1.6, reflect: 0.8, counter: 1,
+    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, light: 1, round: 1, thick: 1.6, reflect: 0.8, counter: 1, cwidth: 1, crough: 0.2,
     // Sources lumineuses posées dans le fond (1 à 3) : x, y sur l'écran (0 à 1), taille et
     // profondeur derrière le verre (0 à 1), intensité (0 à 2), couleur.
     lights: [
@@ -368,7 +368,7 @@
       "uniform vec2 res; uniform float t, scroll, oct, warp, size, fusion, lace, ncol, px;",
       "uniform vec3 cols[8];",
       "uniform vec4 cards[" + MAX_CARDS + "]; uniform float crad[" + MAX_CARDS + "]; uniform float ncard;",
-      "uniform float gZoom, gBezel, gDisp, gFrost, gLight, gRound, gThick, gReflect, gCounter;",
+      "uniform float gZoom, gBezel, gDisp, gFrost, gLight, gRound, gThick, gReflect, gCounter, gCw, gRough;",
       "uniform vec4 lPos[3], lCol[3]; uniform float nlight;",   // sources du fond : (x, y, profondeur, rayon) en pixels CSS ; (couleur, intensité)
       "float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }",
       "float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);",
@@ -472,8 +472,13 @@
       // à la source : un fin liseré net très lumineux contre le bord, et juste à l'intérieur une
       // bande sombre nette (l'ombre inverse), comme sur du verre épais.
       "    float opp = smoothstep(0.0, 0.85, -dot(nrm, toL / max(dl, 1.0))) * smoothstep(0.02, 0.25, rimK);",
-      "    float line = exp(-pow((inside - 1.8) / 1.0, 2.0));",
-      "    float dark = exp(-pow((inside - 5.5) / 2.0, 2.0));",
+      // Épaisseur (gCw) : largeur du liseré et de la bande sombre, qui grandissent ensemble.
+      // Rugosité (gRough) : 0 = bords nets (verre poli) ; plus haut = bords adoucis et trait cassé en grain.
+      "    float soft = mix(0.06, 1.0, gRough);",
+      "    float lc = 1.8 * gCw, lh = 1.0 * gCw, dc = 5.5 * gCw, dh = 2.0 * gCw;",
+      "    float grain = mix(1.0, 0.35 + 1.3 * n(pc * 0.38), gRough);",
+      "    float line = (1.0 - smoothstep(lh * (1.0 - soft), lh * (1.0 + soft) + 0.5, abs(inside - lc))) * grain;",
+      "    float dark = (1.0 - smoothstep(dh * (1.0 - soft), dh * (1.0 + soft) + 0.5, abs(inside - dc))) * grain;",
       "    float pw = clamp(lCol[j].a, 0.0, 1.0);",
       "    col *= 1.0 - 0.42 * dark * opp * near * pw * gCounter;",
       "    col = 1.0 - (1.0 - col) * (1.0 - clamp(lCol[j].rgb * lCol[j].a * line * opp * near * 1.8 * gCounter, 0.0, 1.0));",
@@ -513,7 +518,7 @@
       gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       this.u = {};
       for (const name of ["res", "t", "scroll", "oct", "warp", "size", "fusion", "lace", "ncol", "px", "cols", "cards", "crad", "ncard",
-        "gZoom", "gBezel", "gDisp", "gFrost", "gLight", "gRound", "gThick", "gReflect", "gCounter", "lPos", "lCol", "nlight"]) this.u[name] = gl.getUniformLocation(prog, name);
+        "gZoom", "gBezel", "gDisp", "gFrost", "gLight", "gRound", "gThick", "gReflect", "gCounter", "gCw", "gRough", "lPos", "lCol", "nlight"]) this.u[name] = gl.getUniformLocation(prog, name);
       Object.assign(this, { canvas, gl });
       this.onResize = () => {
         const k = 0.85;  // un peu sous la résolution de l'écran : les bords du verre restent nets, le téléphone respire
@@ -569,6 +574,7 @@
       gl.uniform1f(u.gZoom, glass.zoom); gl.uniform1f(u.gBezel, glass.bezel); gl.uniform1f(u.gDisp, glass.diffraction);
       gl.uniform1f(u.gFrost, glass.frost); gl.uniform1f(u.gLight, glass.light); gl.uniform1f(u.gRound, glass.round);
       gl.uniform1f(u.gThick, glass.thick); gl.uniform1f(u.gReflect, glass.reflect); gl.uniform1f(u.gCounter, glass.counter);
+      gl.uniform1f(u.gCw, glass.cwidth); gl.uniform1f(u.gRough, glass.crough);
       // Sources du fond : elles dérivent lentement avec les vagues (même vitesse que le fond).
       const lp = new Float32Array(12), lcol = new Float32Array(12), lights = glass.lights.slice(0, 3);
       lights.forEach((l, i) => {

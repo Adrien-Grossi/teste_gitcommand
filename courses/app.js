@@ -62,7 +62,7 @@
   const GLASS_DEFAULTS = {
     colors: ["#293dd9", "#8040f2", "#ff5c8c", "#ff8f4d", "#1ac7cc"],
     complexity: 3, size: 1, fusion: 0.24, lace: 0.4, speed: 1,
-    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, light: 1, round: 1, thick: 1.6, reflect: 0.8, counter: 1,
+    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, light: 1, round: 1, thick: 1.6, reflect: 0.8, counter: 1, cwidth: 1, crough: 0.2,
     // Sources lumineuses posées dans le fond (1 à 3) : x, y sur l'écran (0 à 1), taille et
     // profondeur derrière le verre (0 à 1), intensité (0 à 2), couleur.
     lights: [
@@ -766,6 +766,8 @@
     { group: "labGlass", key: "frost", label: "Verre fumé", min: 0, max: 2, step: 0.02, show: (v) => (v ? pct(v) : "clair") },
     { group: "labGlass", key: "reflect", label: "Reflets du décor sur le bord", min: 0, max: 2, step: 0.05, show: (v) => (v ? pct(v) : "aucun") },
     { group: "labGlass", key: "counter", label: "Contre-reflets et ombre nette", min: 0, max: 2, step: 0.05, show: (v) => (v ? pct(v) : "aucun") },
+    { group: "labGlass", key: "cwidth", label: "Épaisseur du contre-reflet", min: 0.4, max: 5, step: 0.05, show: (v) => (v < 0.7 ? "très fin" : v > 3 ? "épais (" + v.toFixed(1) + ")" : v.toFixed(2)) },
+    { group: "labGlass", key: "crough", label: "Rugosité du contre-reflet", min: 0, max: 1, step: 0.02, show: (v) => (v < 0.1 ? "net, poli" : v > 0.8 ? "très rugueux" : pct(v)) },
     { group: "labGlass", key: "light", label: "Éclats des lumières sur le bord", min: 0, max: 4, step: 0.05, show: (v) => (v ? pct(v) : "éteints") },
     { group: "labGlass", key: "round", label: "Arrondi des cartes", min: 0, max: 1, step: 0.02, show: (v) => (v > 0.97 ? "galet" : v < 0.03 ? "coins vifs" : pct(v)) }
   ];
