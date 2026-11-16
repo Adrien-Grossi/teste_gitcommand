@@ -288,86 +288,221 @@ body.sheet-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
 .skin small { color: var(--muted); font-size: .75rem; line-height: 1.25; }
 .swatch { height: 70px; border-radius: 10px; }
 .swatch.carnet { background: linear-gradient(90deg, transparent 18%, #ffd92e 18%, #ffd92e 70%, transparent 70%) 0 52% / 100% 12px no-repeat, #0e0e10; }
-.swatch.verre { background: radial-gradient(60% 70% at 20% 25%, #ff5fa2, transparent), radial-gradient(60% 70% at 85% 80%, #2fe0c8, transparent), linear-gradient(160deg, #2a1660, #0d1b3d); }
+.swatch.verre { background: radial-gradient(60% 70% at 15% 20%, #3f7dff, transparent), radial-gradient(55% 65% at 90% 50%, #ff8a6a, transparent), radial-gradient(50% 60% at 30% 95%, #a35bff, transparent), #0a0f2c; }
 .swatch.argile { background: radial-gradient(circle at 30% 40%, #ffb38a 0 16%, transparent 17%), radial-gradient(circle at 68% 58%, #b9a6ff 0 20%, transparent 21%), #efe7ff; }
 @media (max-width: 380px) { .skins { grid-template-columns: 1fr; } .swatch { height: 52px; } }
 
-/* 8. Style Verre (sombre) ----------------------------------------------- */
+/* 8. Style Verre (sombre) -----------------------------------------------
+   Inspiré du Liquid Glass d'Apple : des plaques presque claires, sans effet fumée.
+   - La réfraction (bords qui courbent l'image, franges rouge/vert/bleu) est ajoutée par
+     effects.js quand le navigateur la permet (classe .liquid sur <html>) ;
+     sinon, un léger dépoli prend le relais.
+   - Reflets nets sur les arêtes, lueur intérieure, reflet qui suit le doigt (--mx, --my).
+   - Fond : grandes taches de couleur floues qui dérivent lentement, comme un fond d'écran Apple. */
 :root[data-skin="verre"] {
-  --bg: #170f3a; --card: rgba(255,255,255,.10); --ink: #ffffff; --muted: rgba(255,255,255,.72);
-  --line: rgba(255,255,255,.2); --hl: #7cf3e3; --hl-ink: #0b1430; --ok: #7cf3b0; --bad: #ff8fa0; --warn: #ffd27a;
+  --bg: #0a0f2c; --card: rgba(255,255,255,.06); --ink: #ffffff; --muted: rgba(255,255,255,.78);
+  --line: rgba(255,255,255,.18); --hl: #8ff5e8; --hl-ink: #08122e; --ok: #8ff5c0; --bad: #ff9aa8; --warn: #ffd58a;
   --radius: 22px; --font-display: "Outfit", "Atkinson Hyperlegible", system-ui, sans-serif;
+  --glass-fill: linear-gradient(150deg, rgba(255,255,255,.12), rgba(255,255,255,.02) 45%, rgba(255,255,255,.06)),
+                linear-gradient(rgba(8,12,40,.16), rgba(8,12,40,.16));   /* légère teinte : texte lisible sur les zones claires */
+  --glass-shine: radial-gradient(140px circle at var(--mx, 15%) var(--my, -30%), rgba(255,255,255,.2), transparent 70%);
+  --glass-light: inset 1.5px 1.5px 0 rgba(255,255,255,.6), inset -1px -1px 0 rgba(255,255,255,.22),
+                 inset 0 0 20px rgba(255,255,255,.07), 0 12px 32px rgba(2,4,24,.32);
+  --glass-edge: linear-gradient(135deg, rgba(255,255,255,.85), rgba(255,255,255,.1) 30%, rgba(255,255,255,0) 55%, rgba(255,255,255,.35) 85%, rgba(255,255,255,.7));
+  --frost: blur(10px) saturate(170%);
   color-scheme: dark;
 }
-/* fond de secours si la 3D n'est pas chargée */
-[data-skin="verre"] body {
-  background: radial-gradient(55% 35% at 10% 8%, rgba(255,95,162,.7), transparent 70%),
-              radial-gradient(50% 35% at 95% 35%, rgba(79,125,255,.7), transparent 70%),
-              linear-gradient(165deg, #241458, #0d1b3d) fixed;
-}
-[data-skin="verre"].fx-3d body { background: #170f3a; }
-[data-skin="verre"] :is(.rows, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost) {
-  background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.24);
-  -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%);
-  box-shadow: 0 10px 30px rgba(5,0,40,.25), inset 0 1px 0 rgba(255,255,255,.35);
-}
-[data-skin="verre"] :is(header, .tabs) {
-  background: rgba(23,15,58,.35); -webkit-backdrop-filter: blur(20px) saturate(160%); backdrop-filter: blur(20px) saturate(160%);
-}
-[data-skin="verre"] body::before { background: rgba(23,15,58,.55); }
-[data-skin="verre"] .sheet { background: rgba(23,15,58,.25); }
-[data-skin="verre"] .picker-panel { background: rgba(23,15,58,.6); -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
-[data-skin="verre"] .bigcta { background: linear-gradient(120deg, #7cf3e3, #9d8bff 60%, #ff8fc8); color: #0b1430; box-shadow: 0 10px 30px rgba(124,243,227,.35); }
-[data-skin="verre"] .btn:not(.ghost) { background: rgba(255,255,255,.92); border-color: transparent; color: #160f3a; }
-[data-skin="verre"] .btn.go { background: var(--ok); }
-[data-skin="verre"] .btn.go.ready { background: var(--hl); }
-[data-skin="verre"] .mic.on { background: var(--hl); color: var(--hl-ink); }
-[data-skin="verre"] .toast { background: rgba(255,255,255,.88); color: #160f3a; -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
-[data-skin="verre"] .badge { background: #fff; color: #160f3a; }
-[data-skin="verre"] .tag-bad { color: #2a0b14; }
-[data-skin="verre"] .rows li { border-top-color: rgba(255,255,255,.14); }
+[data-skin="verre"] body { background: var(--bg); text-shadow: 0 1px 2px rgba(4,6,30,.35); }
 
-/* 9. Style Argile (clair, pastel) --------------------------------------- */
+/* Le fond */
+.backdrop { display: none; }
+[data-skin="verre"] .backdrop { display: block; position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: #0a0f2c; }
+[data-skin="verre"] .backdrop i { position: absolute; border-radius: 50%; filter: blur(30px); will-change: transform; animation: drift 26s ease-in-out infinite alternate; }
+[data-skin="verre"] .backdrop i:nth-child(1) { width: 95vmax; height: 95vmax; left: -45vmax; top: -40vmax; background: radial-gradient(circle at 60% 60%, #3f7dff, #2b2fc9 45%, transparent 70%); }
+[data-skin="verre"] .backdrop i:nth-child(2) { width: 80vmax; height: 80vmax; right: -40vmax; top: 10vh; background: radial-gradient(circle at 40% 45%, #ff9a62, #ff4f84 45%, transparent 70%); animation-duration: 32s; animation-delay: -8s; }
+[data-skin="verre"] .backdrop i:nth-child(3) { width: 85vmax; height: 85vmax; left: -30vmax; bottom: -45vmax; background: radial-gradient(circle at 50% 40%, #a35bff, #5a2bd6 50%, transparent 70%); animation-duration: 38s; animation-delay: -15s; }
+[data-skin="verre"] .backdrop i:nth-child(4) { width: 50vmax; height: 50vmax; right: -15vmax; bottom: 5vh; background: radial-gradient(circle at 50% 50%, #2fe3cf, #1aa3c4 50%, transparent 70%); animation-duration: 29s; animation-delay: -4s; }
+@keyframes drift { to { transform: translate3d(8vw, 6vh, 0) scale(1.12) rotate(18deg); } }
+
+/* La plaque de verre */
+[data-skin="verre"] :is(.rows li, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta) { position: relative; }
+[data-skin="verre"] :is(.rows li, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .tabs, .toast) {
+  background: var(--glass-shine), var(--glass-fill); border: 0; box-shadow: var(--glass-light);
+  -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost);
+}
+/* L'arête : un liseré de 1 px, très clair en haut à gauche et en bas à droite */
+[data-skin="verre"] :is(.rows li, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta, .tabs, .toast)::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: var(--glass-edge);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+/* En-tête : une bande de verre clair, la liste se réfracte dessous en défilant */
+[data-skin="verre"] header {
+  background: linear-gradient(180deg, rgba(10,15,44,.42), rgba(10,15,44,.2));
+  -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost);
+  border-bottom: 0; box-shadow: inset 0 -1px 0 rgba(255,255,255,.28), 0 10px 26px rgba(2,4,24,.18);
+}
+[data-skin="verre"] body::before { background: rgba(10,15,44,.5); }
+[data-skin="verre"] .count b { background: rgba(255,255,255,.16); color: #fff; box-shadow: inset 1px 1px 0 rgba(255,255,255,.6), inset -1px -1px 0 rgba(255,255,255,.2); }
+
+/* Listes : des plaques séparées */
+[data-skin="verre"] .rows { background: none; border: 0; overflow: visible; display: grid; gap: 10px; }
+[data-skin="verre"] .rows li { border-radius: 20px; border-top: 0; }
+[data-skin="verre"] .tap { padding-block: 12px; }
+[data-skin="verre"] .side { border-left: 1px solid rgba(255,255,255,.14); }
+[data-skin="verre"] .box { border-radius: 50%; border: 1.5px solid rgba(255,255,255,.75); background: rgba(255,255,255,.06); box-shadow: inset 1px 1px 0 rgba(255,255,255,.5); }
+[data-skin="verre"] .qty { background: rgba(255,255,255,.14); color: #fff; box-shadow: inset 1px 1px 0 rgba(255,255,255,.45); }
+[data-skin="verre"] .block.here .block-h h2::after { background: rgba(255,255,255,.18); color: #fff; box-shadow: inset 1px 1px 0 rgba(255,255,255,.55); }
+[data-skin="verre"] .block.bad .rows li { box-shadow: var(--glass-light), inset 0 0 0 1px rgba(255,154,168,.5), 0 0 26px rgba(255,120,140,.25); }
+[data-skin="verre"] .block.warn .rows li { box-shadow: var(--glass-light), inset 0 0 0 1px rgba(255,213,138,.45), 0 0 24px rgba(255,200,110,.2); }
+[data-skin="verre"] .tag-bad { background: rgba(255,154,168,.28); color: #fff; box-shadow: inset 1px 1px 0 rgba(255,255,255,.4); }
+[data-skin="verre"] .dot { background: #fff; box-shadow: 0 0 10px rgba(255,255,255,.8); }
+
+/* Boutons : verre teinté pour les actions principales */
+[data-skin="verre"] .bigcta {
+  border-radius: 24px; color: #fff; background: var(--glass-shine), linear-gradient(140deg, rgba(143,245,232,.42), rgba(126,140,255,.32) 55%, rgba(255,140,200,.4));
+  box-shadow: var(--glass-light), 0 14px 36px rgba(110,160,255,.3);
+}
+[data-skin="verre"] .btn:not(.ghost) { background: rgba(255,255,255,.88); border: 0; color: #0a0f2c; text-shadow: none; box-shadow: inset 0 -3px 8px rgba(10,15,44,.12), 0 10px 26px rgba(2,4,24,.3); }
+[data-skin="verre"] .btn.go { background: linear-gradient(140deg, #9ff7cf, #8ff5e8); }
+[data-skin="verre"] .btn.go.ready { background: linear-gradient(140deg, #8ff5e8, #a9b4ff); }
+[data-skin="verre"] .pill.accent, [data-skin="verre"] .mic.on { background: var(--glass-shine), linear-gradient(140deg, rgba(143,245,232,.5), rgba(126,140,255,.4)); color: #fff; }
+[data-skin="verre"] .pad button:active { background: rgba(255,255,255,.22); }
+[data-skin="verre"] .sheet .datebox.ok { box-shadow: var(--glass-light), inset 0 0 0 1.5px rgba(143,245,232,.8), 0 0 26px rgba(143,245,232,.3); }
+
+/* Onglets : une barre de verre qui flotte, l'onglet actif dans une bulle */
+[data-skin="verre"] .tabs { left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); padding: 0; border-radius: 28px; }
+[data-skin="verre"] .tabs button { isolation: isolate; color: rgba(255,255,255,.75); }
+[data-skin="verre"] .tabs [aria-current="page"] { color: #fff; }
+[data-skin="verre"] .tabs [aria-current="page"]::before {
+  top: 7px; bottom: 7px; left: 12%; right: 12%; height: auto; z-index: -1; border-radius: 20px;
+  background: rgba(255,255,255,.16); box-shadow: inset 1.5px 1.5px 0 rgba(255,255,255,.6), inset -1px -1px 0 rgba(255,255,255,.2);
+}
+[data-skin="verre"] .badge { background: #fff; color: #0a0f2c; text-shadow: none; }
+[data-skin="verre"] .badge.hl { background: var(--hl); }
+[data-skin="verre"] .badge.bad { background: var(--bad); color: #2a0b14; }
+[data-skin="verre"] .toast { bottom: calc(var(--tabs-h) + 28px + env(safe-area-inset-bottom, 0px)); border-radius: 20px; color: #fff; }
+[data-skin="verre"] .toast button { text-shadow: none; }
+[data-skin="verre"] .wrap { padding-bottom: calc(var(--tabs-h) + 48px + env(safe-area-inset-bottom, 0px)); }
+[data-skin="verre"] .sheet { background: transparent; }
+[data-skin="verre"] .picker-panel { background: rgba(10,15,44,.5); -webkit-backdrop-filter: blur(20px) saturate(170%); backdrop-filter: blur(20px) saturate(170%); }
+
+/* 9. Style Argile (clair, pastel) ---------------------------------------
+   Chaque élément est un morceau de pâte bombé : couleur pleine (--c), lumière en haut
+   à gauche, creux en bas à droite, ombre portée de sa propre couleur. Chaque rayon a sa teinte. */
 :root[data-skin="argile"] {
-  --bg: #efe7ff; --card: #fbf8ff; --ink: #3a2e5c; --muted: #7d7299; --line: #e8e0f7;
-  --hl: #ffb86b; --hl-ink: #3a2e5c; --ok: #2fb383; --bad: #e14f66; --warn: #b8690f; --radius: 28px;
+  --bg: #f1eaff; --card: #fffaff; --ink: #3a2e5c; --muted: #7d7299; --line: #e6dcf7;
+  --hl: #ffb86b; --hl-ink: #3a2e5c; --ok: #2fb383; --bad: #e14f66; --warn: #b8690f; --radius: 26px;
   --font-display: "Fredoka", "Nunito", system-ui, sans-serif; --font-body: "Nunito", "Atkinson Hyperlegible", system-ui, sans-serif;
-  --clay: 8px 8px 18px rgba(124,98,190,.22), -6px -6px 14px rgba(255,255,255,.95),
-          inset 2px 2px 4px rgba(255,255,255,.9), inset -3px -3px 6px rgba(124,98,190,.10);
   color-scheme: light;
 }
-[data-skin="argile"] body {
-  background: radial-gradient(45% 30% at 0% 0%, #ffd6e8, transparent 70%), radial-gradient(45% 30% at 100% 25%, #d2efff, transparent 70%), #efe7ff fixed;
-}
+[data-skin="argile"] body { background: linear-gradient(180deg, #f6f0ff, #ece3ff) fixed; }
 [data-skin="argile"].fx-3d body { background: #efe7ff; }
-[data-skin="argile"] header { background: rgba(239,231,255,.78); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-bottom: 0; }
-[data-skin="argile"] :is(.rows, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost) { background: var(--card); border: 0; box-shadow: var(--clay); }
-[data-skin="argile"] .rows { margin-inline: 2px; }
-[data-skin="argile"] .rows li { border-top: 2px solid #f1ebfc; }
-[data-skin="argile"] .box { border: 0; border-radius: 10px; background: #efe7ff; box-shadow: inset 3px 3px 6px rgba(124,98,190,.22), inset -3px -3px 6px #fff; }
-[data-skin="argile"] :is(.pill, .btn, .pad button, .mic) { border-radius: 20px; }
-[data-skin="argile"] .bigcta {
-  border-radius: 26px; background: linear-gradient(160deg, #ffcf9a, #ff9a6b); color: #3a1f12;
-  box-shadow: 0 12px 24px rgba(255,140,90,.35), inset 0 -6px 12px rgba(0,0,0,.08), inset 0 6px 12px rgba(255,255,255,.55);
+
+/* Le volume : appliqué à tout élément qui porte une couleur --c.
+   La couleur par défaut est posée sans aucune priorité (:where), pour que chaque élément puisse la changer. */
+:where([data-skin="argile"]) :where(.rows li, .card, .pill, .iconbtn, .skin, .pad button, .mic, .btn, .bigcta, .tabs, .toast, .badge, .count b, .side) { --c: #fffaff; }
+[data-skin="argile"] :is(.rows li, .card, .pill, .iconbtn, .skin, .pad button, .mic, .btn, .bigcta, .tabs, .toast, .badge, .count b, .side) {
+  background: var(--c); border: 0;
+  box-shadow:
+    0 14px 24px -8px color-mix(in srgb, var(--c) 45%, #4b2f9a 55%),
+    inset 6px 8px 12px rgba(255,255,255,.75),
+    inset -6px -8px 14px color-mix(in srgb, var(--c) 70%, #4b2f9a 30%);
 }
-[data-skin="argile"] .btn:not(.ghost) { border: 0; color: #fff; background: linear-gradient(160deg, #9b86e0, #7c62be); box-shadow: 0 10px 20px rgba(124,98,190,.35), inset 0 -5px 10px rgba(0,0,0,.1), inset 0 5px 10px rgba(255,255,255,.35); }
-[data-skin="argile"] .btn.go { background: linear-gradient(160deg, #6fe0b5, #2fb383); color: #08392a; }
-[data-skin="argile"] .btn.go.ready { background: linear-gradient(160deg, #ffcf9a, #ff9a6b); color: #3a1f12; }
-[data-skin="argile"] .mic.on { background: var(--hl); }
-[data-skin="argile"] .qty { border-radius: 99px; background: #ffe2c2; padding: 1px 9px; }
-[data-skin="argile"] .tag-bad { border-radius: 99px; color: #fff; }
-[data-skin="argile"] .sheet { background: transparent; }
-[data-skin="argile"] .tabs {
-  --tabs-h: 66px; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); padding: 0;
-  border: 0; border-radius: 28px; background: var(--card);
-  box-shadow: 0 14px 30px rgba(124,98,190,.3), inset 0 2px 4px #fff, inset 0 -4px 8px rgba(124,98,190,.12);
+/* Teintes : une par rayon, une par urgence */
+[data-skin="argile"] [data-aisle="fl"] { --tint: #c6f1dc; }
+[data-skin="argile"] [data-aisle="pain"] { --tint: #ffe6bf; }
+[data-skin="argile"] [data-aisle="sale"] { --tint: #ffd8c8; }
+[data-skin="argile"] [data-aisle="epices"] { --tint: #ffdcae; }
+[data-skin="argile"] [data-aisle="sucre"] { --tint: #ffd3e6; }
+[data-skin="argile"] [data-aisle="boissons"] { --tint: #cfe7ff; }
+[data-skin="argile"] [data-aisle="jelly"] { --tint: #e4dbff; }
+[data-skin="argile"] [data-aisle="maison"] { --tint: #d3f1f4; }
+[data-skin="argile"] [data-aisle="hygiene"] { --tint: #f3dcff; }
+[data-skin="argile"] [data-aisle="viande"] { --tint: #ffd0d0; }
+[data-skin="argile"] [data-aisle="frais"] { --tint: #fff0b8; }
+[data-skin="argile"] [data-aisle="surgeles"] { --tint: #d6e8ff; }
+[data-skin="argile"] [data-aisle="pharma"] { --tint: #e3f4cf; }
+[data-skin="argile"] .block.bad { --tint: #ffc6cf; }
+[data-skin="argile"] .block.warn { --tint: #ffdcb5; }
+[data-skin="argile"] .block:not([data-aisle]):not(.bad):not(.warn) { --tint: #ece4ff; }
+[data-skin="argile"] #rangeList { --tint: #fff4c2; }
+[data-skin="argile"] .block.quiet { --tint: #eee8f7; }
+[data-skin="argile"] .rows li { --c: var(--tint, #fffaff); }
+
+/* Listes : des galets séparés */
+[data-skin="argile"] header { background: rgba(241,234,255,.82); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-bottom: 0; }
+[data-skin="argile"] h1 { font-weight: 700; }
+[data-skin="argile"] .rows { background: none; border: 0; overflow: visible; display: grid; gap: 12px; }
+[data-skin="argile"] .rows li { border-radius: 24px; border-top: 0; align-items: center; padding-right: 8px; }
+[data-skin="argile"] .block-h h2 {
+  font-size: 1.05rem; padding: 4px 14px; border-radius: 99px; background: var(--tint, #fffaff);
+  box-shadow: 0 6px 12px -6px color-mix(in srgb, var(--tint, #fffaff) 40%, #4b2f9a 60%), inset 2px 3px 5px rgba(255,255,255,.8), inset -2px -3px 6px color-mix(in srgb, var(--tint, #fffaff) 75%, #4b2f9a 25%);
 }
-[data-skin="argile"] .tabs [aria-current="page"] { color: #7c62be; }
-[data-skin="argile"] .tabs [aria-current="page"]::before { top: auto; bottom: 8px; left: calc(50% - 4px); right: auto; width: 8px; height: 8px; border-radius: 50%; background: #7c62be; }
-[data-skin="argile"] .toast { bottom: calc(var(--tabs-h) + 26px + env(safe-area-inset-bottom, 0px)); border-radius: 22px; background: #3a2e5c; color: #fff; }
-[data-skin="argile"] .badge { box-shadow: 0 4px 8px rgba(124,98,190,.35); }
-[data-skin="argile"] .badge.hl { background: #ffb86b; }
+[data-skin="argile"] .block.here .block-h h2::after { background: #fff; color: #7c62be; border-radius: 99px; }
+[data-skin="argile"] .box {
+  width: 30px; height: 30px; border: 0; border-radius: 12px;
+  background: color-mix(in srgb, var(--tint, #efe7ff) 80%, #4b2f9a 8%);
+  box-shadow: inset 4px 4px 7px color-mix(in srgb, var(--tint, #efe7ff) 55%, #4b2f9a 45%), inset -3px -3px 6px rgba(255,255,255,.85);
+}
+[data-skin="argile"] .dot { width: 16px; height: 16px; background: #ffb86b; box-shadow: inset 2px 2px 3px rgba(255,255,255,.7), inset -2px -2px 3px rgba(160,80,20,.3); }
+[data-skin="argile"] .qty { --c: #fffaff; background: #fffaff; border-radius: 99px; padding: 1px 9px; box-shadow: inset 1px 1px 2px rgba(255,255,255,.9), inset -1px -2px 3px rgba(75,47,154,.15); }
+[data-skin="argile"] .side {
+  --c: #fffaff; width: 48px; height: 48px; border-radius: 50%; padding: 0; gap: 0; font-size: 0;
+}
+[data-skin="argile"] .side svg { width: 18px; height: 18px; color: #7d7299; }
+[data-skin="argile"] .when b { font-size: 1.25rem; }
+[data-skin="argile"] .tag-bad { border-radius: 99px; color: #fff; box-shadow: inset 2px 2px 4px rgba(255,255,255,.4), inset -2px -2px 4px rgba(0,0,0,.15); }
+
+/* Boutons et pavé */
+[data-skin="argile"] .bigcta { --c: #ffb47e; color: #4a230d; border-radius: 28px; }
+[data-skin="argile"] .btn { --c: #a996ef; color: #fff; border-radius: 22px; }
+[data-skin="argile"] .btn.ghost { --c: #fffaff; color: var(--ink); }
+[data-skin="argile"] .btn.go { --c: #7fe0b8; color: #08392a; }
+[data-skin="argile"] .btn.go.ready { --c: #ffb47e; color: #4a230d; animation: none; }
+[data-skin="argile"] .btn:disabled { opacity: .55; }
+[data-skin="argile"] .pill { border-radius: 99px; }
+[data-skin="argile"] .pill.accent { --c: #ffb47e; color: #4a230d; }
+[data-skin="argile"] .mic { --c: #fffaff; border-radius: 22px; }
+[data-skin="argile"] .mic.on { --c: #ffb47e; color: #4a230d; animation: none; }
+[data-skin="argile"] .pad button { border-radius: 22px; font-size: clamp(1.3rem, 6vw, 1.8rem); }
+[data-skin="argile"] .pad .fn { font-size: 1rem; color: var(--muted); }
+[data-skin="argile"] .pad button:active, [data-skin="argile"] .btn:active, [data-skin="argile"] .pill:active {
+  box-shadow: inset 5px 6px 10px color-mix(in srgb, var(--c) 60%, #4b2f9a 40%), inset -4px -4px 8px rgba(255,255,255,.8);
+}
+/* La date est enfoncée dans la pâte, les chiffres en relief */
+[data-skin="argile"] .datebox {
+  border: 0; border-radius: 26px; background: #ece3ff;
+  box-shadow: inset 6px 8px 14px rgba(75,47,154,.22), inset -6px -6px 12px rgba(255,255,255,.9);
+  text-shadow: 1px 2px 0 rgba(255,255,255,.9), -1px -1px 0 rgba(75,47,154,.15);
+}
+[data-skin="argile"] .datebox.ok { background: #dff7ec; }
+[data-skin="argile"] .datebox .ph { color: #d7cbf0; }
+
+/* Onglets : une barre de pâte qui flotte ; l'onglet actif est porté par une bulle colorée */
+[data-skin="argile"] .tabs { --c: #fffaff; left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); padding: 0; border-radius: 30px; }
+[data-skin="argile"] .tabs button { isolation: isolate; }
+[data-skin="argile"] .tabs [aria-current="page"] { color: #fff; }
+[data-skin="argile"] .tabs [aria-current="page"]::before {
+  top: 7px; bottom: 7px; left: 14%; right: 14%; height: auto; z-index: -1; border-radius: 22px; background: #a996ef;
+  box-shadow: 0 8px 16px -6px rgba(75,47,154,.6), inset 3px 4px 6px rgba(255,255,255,.55), inset -3px -4px 8px rgba(75,47,154,.35);
+}
+/* Petites pastilles : même volume, mais un relief à leur échelle */
+[data-skin="argile"] :is(.badge, .count b) {
+  box-shadow: 0 4px 8px -2px color-mix(in srgb, var(--c) 45%, #4b2f9a 55%),
+    inset 1px 2px 2px rgba(255,255,255,.55), inset -1px -2px 3px color-mix(in srgb, var(--c) 65%, #000 35%);
+}
+[data-skin="argile"] .badge { --c: #3a2e5c; color: #fff; }
+[data-skin="argile"] .badge.hl { --c: #ffb47e; color: #4a230d; }
+[data-skin="argile"] .badge.bad { --c: #f26d84; color: #fff; }
+[data-skin="argile"] .count b { --c: #ffb47e; border-radius: 99px; padding: 1px 12px; }
+[data-skin="argile"] .toast { --c: #3a2e5c; color: #fff; border-radius: 24px; bottom: calc(var(--tabs-h) + 28px + env(safe-area-inset-bottom, 0px)); }
+[data-skin="argile"] .toast button { border-radius: 16px; background: #ffb47e; color: #4a230d; }
 [data-skin="argile"] .wrap { padding-bottom: calc(var(--tabs-h) + 48px + env(safe-area-inset-bottom, 0px)); }
+[data-skin="argile"] .sheet { background: transparent; }
+[data-skin="argile"] .skin[aria-pressed="true"] { outline-color: #a996ef; }
 
 /* 10. Mouvements réduits ------------------------------------------------ */
 @media (prefers-reduced-motion: reduce) {

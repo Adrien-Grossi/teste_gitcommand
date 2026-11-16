@@ -6,7 +6,8 @@
    Bibliothèques, intégrées dans vendor/ et chargées seulement quand le style en a besoin :
      GSAP            animations de l'interface (surligneur, écrasement, apparitions)
      canvas-confetti confettis quand un rayon ou la liste est terminé
-     Three.js        scènes 3D en fond : Verre (aurore + objets en verre), Argile (pâte à modeler)
+     Three.js        scène 3D en fond du style Argile (pâte à modeler)
+   Sans bibliothèque : la réfraction du style Verre (filtres SVG calculés ici).
 
    API : setSkin(skin) · leave(li, action) → Promise · celebrate(kind, rect) · enter(view)
    ========================================================================= */
@@ -36,7 +37,7 @@
   const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 
   let skin = "carnet";
-  let scene = null;          // scène 3D active (Verre ou Argile)
+  let scene = null;          // scène 3D active (Argile)
 
   /* ---------- Style ---------------------------------------------------- */
   function setSkin(next) {
@@ -44,11 +45,12 @@
     if (reduced) return;
     load("gsap").catch(() => {});
     load("confetti").catch(() => {});
-    if (scene && scene.skin !== next) { scene.dispose(); scene = null; }
-    if ((next === "verre" || next === "argile") && !scene) {
+    if (next === "verre") liquid.start(); else liquid.stop();
+    if (scene && next !== "argile") { scene.dispose(); scene = null; }
+    if (next === "argile" && !scene) {
       load("three").then(() => {
-        if (skin !== next || scene) return;
-        try { scene = next === "verre" ? glassScene() : clayScene(); } catch (e) { scene = null; }
+        if (skin !== "argile" || scene) return;
+        try { scene = clayScene(); } catch (e) { scene = null; }
       }).catch(() => {});
     }
   }
@@ -155,6 +157,115 @@
     window.addEventListener("pointerup", release); window.addEventListener("pointercancel", release);
   }, { passive: true });
 
+  // Verre : le reflet de chaque plaque suit le doigt (variables --mx / --my lues par app.css).
+  const GLASS = ".rows li, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta";
+  const shine = (e) => {
+    if (skin !== "verre" || !e.target.closest) return;
+    const el = e.target.closest(GLASS); if (!el) return;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty("--mx", e.clientX - r.left + "px");
+    el.style.setProperty("--my", e.clientY - r.top + "px");
+  };
+  document.addEventListener("pointermove", shine, { passive: true });
+  document.addEventListener("pointerdown", shine, { passive: true });
+
+  /* =====================  Verre liquide (réfraction)  ===================== *
+   * Comme le Liquid Glass d'Apple : derrière chaque plaque, l'image est courbée sur les bords
+   * (une lentille épaisse), et le rouge, le vert et le bleu sont courbés un peu différemment,
+   * ce qui crée une frange irisée (diffraction). Pour chaque taille de plaque, on calcule une
+   * carte de déformation (canvas) et un filtre SVG, appliqué en backdrop-filter.
+   * Chrome seulement ; ailleurs, le verre dépoli défini dans app.css reste en place.          */
+  const LIQUID = ".rows li, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta, header, .tabs, .toast";
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const liquid = {
+    supported: (() => { try { return CSS.supports("backdrop-filter", "url(#x)") && /Chrome\//.test(navigator.userAgent); } catch (e) { return false; } })(),
+    filters: new Map(), defs: null, observer: null, frame: 0, on: false,
+
+    // Carte de déformation : rouge = décalage horizontal, vert = décalage vertical (128 = aucun).
+    // Plus on est près du bord (dans la « tranche » du verre), plus l'image est tirée vers l'intérieur.
+    map(w, h, r, bezel) {
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      const g = c.getContext("2d"), img = g.createImageData(w, h), px = img.data;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const ox = x + 0.5 - w / 2, oy = y + 0.5 - h / 2;
+          const qx = Math.abs(ox) - (w / 2 - r), qy = Math.abs(oy) - (h / 2 - r);
+          const outside = Math.hypot(Math.max(qx, 0), Math.max(qy, 0));
+          const depth = -(outside + Math.min(Math.max(qx, qy), 0) - r);   // distance au bord, vers l'intérieur
+          let nx = 0, ny = 0;
+          if (qx > 0 && qy > 0) { nx = qx / outside; ny = qy / outside; } else if (qx > qy) nx = 1; else ny = 1;
+          nx *= Math.sign(ox) || 1; ny *= Math.sign(oy) || 1;
+          const k = depth < bezel ? Math.pow(1 - Math.max(depth, 0) / bezel, 2) : 0;
+          const i = (y * w + x) * 4;
+          px[i] = 128 - nx * k * 127; px[i + 1] = 128 - ny * k * 127; px[i + 2] = 128; px[i + 3] = 255;
+        }
+      }
+      g.putImageData(img, 0, 0);
+      return c.toDataURL();
+    },
+    // Un filtre par taille : trois déformations (rouge, vert, bleu) recombinées.
+    filter(w, h, r) {
+      const id = "lg-" + w + "-" + h + "-" + r;
+      if (this.filters.has(id)) return id;
+      if (!this.defs) {
+        const svg = document.createElementNS(SVG_NS, "svg");
+        svg.setAttribute("aria-hidden", "true");
+        svg.setAttribute("style", "position:absolute;width:0;height:0;overflow:hidden");
+        this.defs = document.createElementNS(SVG_NS, "defs");
+        svg.appendChild(this.defs);
+        document.body.appendChild(svg);
+      }
+      const bezel = Math.max(8, Math.min(18, Math.min(w, h) * 0.3)), scale = bezel * 1.9;
+      const channel = (n, s) => '<feDisplacementMap in="SourceGraphic" in2="map" scale="' + s.toFixed(1) + '" xChannelSelector="R" yChannelSelector="G" result="d' + n + '"/>' +
+        '<feColorMatrix in="d' + n + '" type="matrix" values="' + ["1 0 0 0 0 0 0 0 0 0 0 0 0 0 0", "0 0 0 0 0 0 1 0 0 0 0 0 0 0 0", "0 0 0 0 0 0 0 0 0 0 0 0 1 0 0"][n] + ' 0 0 0 1 0" result="c' + n + '"/>';
+      const f = document.createElementNS(SVG_NS, "filter");
+      f.setAttribute("id", id);
+      for (const [k, v] of Object.entries({ x: 0, y: 0, width: w, height: h, filterUnits: "userSpaceOnUse", "color-interpolation-filters": "sRGB" })) f.setAttribute(k, v);
+      f.innerHTML = '<feImage href="' + this.map(w, h, r, bezel) + '" x="0" y="0" width="' + w + '" height="' + h + '" preserveAspectRatio="none" result="map"/>' +
+        channel(0, scale) + channel(1, scale * 0.9) + channel(2, scale * 0.8) +
+        '<feBlend in="c0" in2="c1" mode="screen" result="rg"/><feBlend in="rg" in2="c2" mode="screen" result="rgb"/>' +
+        '<feGaussianBlur in="rgb" stdDeviation="0.5"/>';
+      this.defs.appendChild(f);
+      this.filters.set(id, f);
+      return id;
+    },
+    apply() {
+      this.frame = 0;
+      if (!this.on) return;
+      document.querySelectorAll(LIQUID).forEach((el) => {
+        const box = el.getBoundingClientRect();
+        if (!box.width || !box.height) return;
+        const w = Math.round(box.width), h = Math.round(box.height);
+        const r = Math.round(Math.min(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0, w / 2, h / 2));
+        const id = this.filter(w, h, r);
+        if (el.dataset.lg === id) return;
+        el.dataset.lg = id;
+        // Les barres (en-tête, onglets) floutent un peu en plus : le texte qui passe dessous ne gêne pas la lecture.
+        const bar = el.matches("header, .tabs, .toast");
+        el.style.backdropFilter = el.style.webkitBackdropFilter = "url(#" + id + ")" + (bar ? " blur(5px)" : "") + " saturate(1.5) brightness(1.05)";
+      });
+    },
+    schedule() { if (!this.frame) this.frame = requestAnimationFrame(() => this.apply()); },
+    start() {
+      if (!this.supported || this.on) return;
+      this.on = true;
+      document.documentElement.classList.add("liquid");
+      this.observer = new MutationObserver(() => this.schedule());
+      this.observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden", "open"] });
+      this.onResize = () => this.schedule();
+      addEventListener("resize", this.onResize);
+      this.schedule();
+    },
+    stop() {
+      if (!this.on) return;
+      this.on = false;
+      document.documentElement.classList.remove("liquid");
+      this.observer.disconnect();
+      removeEventListener("resize", this.onResize);
+      document.querySelectorAll("[data-lg]").forEach((el) => { el.style.backdropFilter = el.style.webkitBackdropFilter = ""; delete el.dataset.lg; });
+    }
+  };
+
   /* =====================  Scènes 3D (Three.js)  ======================== */
   // Ramène une position dans [min, max[ : les objets bouclent pendant le défilement.
   const wrap = (v, min, max) => ((((v - min) % (max - min)) + (max - min)) % (max - min)) + min;
@@ -207,108 +318,6 @@
         document.documentElement.classList.remove("fx-3d");
       }
     };
-  }
-
-  /* ---------- Verre : aurore animée + objets en verre ------------------ */
-  function glassScene() {
-    const THREE = window.THREE;
-    const sceneMain = new THREE.Scene();
-
-    // Aurore : un fond plein écran calculé par le GPU (bruit fractal qui ondule lentement).
-    const aurora = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
-      uniforms: { t: { value: 0 }, shift: { value: 0 } },
-      depthWrite: false, depthTest: false,
-      vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
-      fragmentShader: [
-        "varying vec2 vUv; uniform float t; uniform float shift;",
-        "float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }",
-        "float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);",
-        "  return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }",
-        "float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++){ v += a*n(p); p *= 2.0; a *= 0.5; } return v; }",
-        "void main(){",
-        "  vec2 p = vUv * vec2(1.6, 3.0) + vec2(0.0, shift);",
-        "  float q = fbm(p + t*0.05);",
-        "  float r = fbm(p + q*1.8 + vec2(t*0.04, -t*0.03));",
-        "  vec3 deep = vec3(0.07, 0.04, 0.2), violet = vec3(0.42, 0.22, 0.95), pink = vec3(1.0, 0.36, 0.64), teal = vec3(0.18, 0.88, 0.78);",
-        "  vec3 c = mix(deep, violet, smoothstep(0.25, 0.75, r));",
-        "  c = mix(c, pink, smoothstep(0.45, 0.8, q) * 0.85);",
-        "  c = mix(c, teal, smoothstep(0.42, 0.8, r*q*1.9) * 0.85);",
-        "  c *= 0.85 + 0.25*vUv.y;",
-        "  gl_FragColor = vec4(c, 1.0);",
-        "}"
-      ].join("\n")
-    }));
-    aurora.frustumCulled = false; aurora.renderOrder = -1;
-    sceneMain.add(aurora);
-
-    // Reflets : une carte d'environnement aux couleurs de l'aurore.
-    const env = document.createElement("canvas"); env.width = 256; env.height = 128;
-    const g = env.getContext("2d");
-    const grad = g.createLinearGradient(0, 0, 256, 128);
-    grad.addColorStop(0, "#ff5fa2"); grad.addColorStop(0.35, "#6b4dff"); grad.addColorStop(0.7, "#2fe0c8"); grad.addColorStop(1, "#ffffff");
-    g.fillStyle = grad; g.fillRect(0, 0, 256, 128);
-    const envTex = new THREE.CanvasTexture(env); envTex.mapping = THREE.EquirectangularReflectionMapping;
-
-    // Le verre : un corps presque transparent qui reflète l'aurore + un liseré irisé sur les bords.
-    const body = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff, metalness: 0, roughness: 0.06, clearcoat: 1, clearcoatRoughness: 0.04,
-      transparent: true, opacity: 0.22, envMapIntensity: 2.2, side: THREE.DoubleSide, depthWrite: false
-    });
-    const rimUniforms = { t: { value: 0 } };
-    const rim = new THREE.ShaderMaterial({
-      uniforms: rimUniforms, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-      vertexShader: "varying vec3 vN; varying vec3 vV; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }",
-      fragmentShader: "varying vec3 vN; varying vec3 vV; uniform float t; void main(){ float f = pow(1.0 - abs(dot(vN, vV)), 2.4); vec3 c = 0.55 + 0.45*cos(6.2831*(f*0.7 + t*0.05 + vec3(0.0, 0.33, 0.67))); gl_FragColor = vec4(c*f*1.5 + f*0.35, f); }"
-    });
-    const shapes = [
-      new THREE.TorusGeometry(0.9, 0.34, 48, 96), new THREE.IcosahedronGeometry(0.95, 0), new THREE.SphereGeometry(0.75, 48, 48),
-      new THREE.TorusKnotGeometry(0.6, 0.2, 140, 20), new THREE.OctahedronGeometry(0.9, 0), new THREE.TorusGeometry(0.55, 0.22, 32, 64),
-      new THREE.DodecahedronGeometry(0.8, 0), new THREE.SphereGeometry(0.45, 32, 32)
-    ];
-    const lights = new THREE.Group();
-    const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(3, 4, 5); lights.add(key);
-    lights.add(new THREE.AmbientLight(0xb9a6ff, 0.6));
-    sceneMain.add(lights);
-
-    const objects = shapes.map((geo, i) => {
-      const group = new THREE.Group();
-      group.add(new THREE.Mesh(geo, body), new THREE.Mesh(geo, rim));
-      const side = i % 2 ? 1 : -1;
-      group.userData = {
-        side: side * (0.7 + Math.random() * 0.4), y: 1.5 - i * 2.4, z: -1 - Math.random() * 2.5,
-        spin: new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(0.5),
-        phase: Math.random() * 6.28
-      };
-      group.scale.setScalar(0.8 + Math.random() * 0.5);
-      sceneMain.add(group);
-      return group;
-    });
-
-    const s = stage({
-      scene: sceneMain, maxPixelRatio: 1.5,
-      frame(t, dt, { tilt, scroll, energy }) {
-        aurora.material.uniforms.t.value = t;
-        aurora.material.uniforms.shift.value = scroll * 0.35;
-        rimUniforms.t.value = t;
-        for (const o of objects) {
-          const u = o.userData;
-          const x = u.side * halfWidth(s.camera, 7 - u.z);
-          o.position.set(x + Math.sin(t * 0.4 + u.phase) * 0.25, wrap(u.y + scroll * 4, -12, 7.2) + Math.sin(t * 0.6 + u.phase) * 0.2, u.z);
-          o.rotation.x += u.spin.x * dt * (1 + energy * 4);
-          o.rotation.y += u.spin.y * dt * (1 + energy * 4);
-          o.rotation.z += u.spin.z * dt * (1 + energy * 4);
-        }
-        s.camera.position.set(tilt.x * 0.6, -tilt.y * 0.4, 7);
-        s.camera.lookAt(0, 0, -2);
-      }
-    });
-    s.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    // Les reflets du verre : l'aurore convertie en carte d'environnement.
-    const pmrem = new THREE.PMREMGenerator(s.renderer);
-    const envMap = pmrem.fromEquirectangular(envTex).texture;
-    pmrem.dispose();
-    body.envMap = envMap; body.needsUpdate = true;
-    return { skin: "verre", kick: s.kick, dispose() { s.dispose(); envMap.dispose(); envTex.dispose(); } };
   }
 
   /* ---------- Argile : boules de pâte à modeler sur une table ---------- */

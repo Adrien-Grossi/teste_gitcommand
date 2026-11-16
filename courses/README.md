@@ -16,9 +16,9 @@ Trois onglets, un par moment :
 | `index.html` | Structure de la page (aucune logique) |
 | `app.css` | Styles : Carnet (clair/sombre), Verre, Argile |
 | `app.js` | Logique : catalogue, données, affichage, dates, voix, rappels, transfert |
-| `effects.js` | Effets visuels facultatifs (`window.CoursesFX`) ; l'appli marche sans eux |
+| `effects.js` | Effets facultatifs (`window.CoursesFX`) : animations, réfraction du Verre, fond 3D d'Argile ; l'appli marche sans eux |
 | `sw.js` | Hors ligne et notifications de péremption |
-| `vendor/` | GSAP, canvas-confetti, Three.js r128 (voir `vendor/README.md`) |
+| `vendor/` | GSAP, canvas-confetti, Three.js r128 pour le fond 3D d'Argile (voir `vendor/README.md`) |
 | `manifest.webmanifest`, `icon-*.png` | Installation sur l'écran d'accueil |
 
 Les données restent sur le téléphone (`localStorage`, clé `courses-v1`).
