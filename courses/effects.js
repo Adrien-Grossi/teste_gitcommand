@@ -182,8 +182,9 @@
     filters: new Map(), defs: null, observer: null, frame: 0, on: false,
 
     // Carte de déformation : rouge = décalage horizontal, vert = décalage vertical (128 = aucun).
-    // Deux effets s'additionnent, comme dans une loupe en verre épais :
-    //  - la tranche (bezel) : près du bord, l'image est fortement tirée vers l'intérieur ;
+    // Deux effets s'additionnent, comme dans une bille de verre soufflé aplatie :
+    //  - le bord bombé (bezel) : profil en quart de cercle ; l'image est très courbée tout au bord,
+    //    puis la courbure s'adoucit vers l'intérieur (pente du profil), sans arête ;
     //  - le grossissement (zoom > 1) : tout l'intérieur montre une zone plus petite, donc agrandie.
     // range = décalage maximal en pixels, qui devient l'échelle du filtre.
     map(w, h, r, bezel, zoom, range) {
@@ -199,7 +200,9 @@
           let nx = 0, ny = 0;
           if (qx > 0 && qy > 0) { nx = qx / outside; ny = qy / outside; } else if (qx > qy) nx = 1; else ny = 1;
           nx *= Math.sign(ox) || 1; ny *= Math.sign(oy) || 1;
-          const edge = depth < bezel ? Math.pow(1 - Math.max(depth, 0) / bezel, 2) * bezel : 0;
+          // pente d'un bord en quart de cercle : (1 - t) / √(1 - (1 - t)²), bornée tout au bord
+          const t = Math.max(0.06, Math.min(1, depth / bezel)), u = 1 - t;
+          const edge = depth < bezel ? (u / Math.sqrt(1 - u * u)) / 3 * bezel : 0;
           const dx = -ox * shrink - nx * edge, dy = -oy * shrink - ny * edge;
           const i = (y * w + x) * 4;
           px[i] = 128 + Math.max(-1, Math.min(1, dx / range)) * 127;
@@ -223,8 +226,10 @@
         svg.appendChild(this.defs);
         document.body.appendChild(svg);
       }
-      const bezel = Math.max(8, Math.min(lens ? 26 : 16, Math.min(w, h) * 0.38));
-      const zoom = lens ? 1.12 : 1;
+      // Bombé proportionné : fort sur les grandes cartes, discret sur les petits boutons (sinon l'image se déchire).
+      const small = Math.min(w, h) < 90 || w < 200;
+      const bezel = Math.max(8, Math.min(lens && !small ? 32 : 14, Math.min(w, h) * (small ? 0.22 : 0.45)));
+      const zoom = lens && !small ? 1.12 : 1;
       const range = bezel + (Math.max(w, h) / 2) * (1 - 1 / zoom);
       const scale = range * 2;
       const channel = (n, s) => '<feDisplacementMap in="SourceGraphic" in2="map" scale="' + s.toFixed(1) + '" xChannelSelector="R" yChannelSelector="G" result="d' + n + '"/>' +
@@ -233,8 +238,9 @@
       f.setAttribute("id", id);
       for (const [k, v] of Object.entries({ x: 0, y: 0, width: w, height: h, filterUnits: "userSpaceOnUse", "color-interpolation-filters": "sRGB" })) f.setAttribute(k, v);
       f.innerHTML = '<feImage href="' + this.map(w, h, r, bezel, zoom, range) + '" x="0" y="0" width="' + w + '" height="' + h + '" preserveAspectRatio="none" result="map"/>' +
-        channel(0, scale) + channel(1, scale * 0.86) + channel(2, scale * 0.72) +
-        '<feBlend in="c0" in2="c1" mode="screen" result="rg"/><feBlend in="rg" in2="c2" mode="screen"/>';
+        channel(0, scale) + channel(1, scale * 0.92) + channel(2, scale * 0.84) +
+        '<feBlend in="c0" in2="c1" mode="screen" result="rg"/><feBlend in="rg" in2="c2" mode="screen" result="rgb"/>' +
+        '<feGaussianBlur in="rgb" stdDeviation="0.5"/>';
       this.defs.appendChild(f);
       this.filters.set(id, f);
       return id;

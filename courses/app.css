@@ -298,29 +298,35 @@ body.sheet-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
      effects.js quand le navigateur la permet (classe .liquid sur <html>) ;
      sinon, un léger dépoli prend le relais.
    - Reflets nets sur les arêtes, lueur intérieure, reflet qui suit le doigt (--mx, --my).
-   - Fond : grandes taches de couleur floues qui dérivent lentement, comme un fond d'écran Apple. */
+   - Fond : grands disques de couleur aux bords nets qui dérivent lentement. */
 :root[data-skin="verre"] {
   --bg: #0a0f2c; --card: rgba(255,255,255,.06); --ink: #ffffff; --muted: rgba(255,255,255,.78);
   --line: rgba(255,255,255,.18); --hl: #8ff5e8; --hl-ink: #08122e; --ok: #8ff5c0; --bad: #ff9aa8; --warn: #ffd58a;
   --radius: 22px; --font-display: "Outfit", "Atkinson Hyperlegible", system-ui, sans-serif;
   --glass-fill: linear-gradient(150deg, rgba(255,255,255,.07), rgba(255,255,255,0) 40%);   /* verre clair : juste un reflet en haut à gauche */
   --glass-shine: radial-gradient(120px circle at var(--mx, 15%) var(--my, -30%), rgba(255,255,255,.16), transparent 70%);
-  --glass-light: inset 1.5px 1.5px 0 rgba(255,255,255,.6), inset -1px -1px 0 rgba(255,255,255,.22),
-                 inset 0 0 14px rgba(255,255,255,.05), 0 12px 32px rgba(2,4,24,.3);
-  --glass-edge: linear-gradient(135deg, rgba(255,255,255,.85), rgba(255,255,255,.1) 30%, rgba(255,255,255,0) 55%, rgba(255,255,255,.35) 85%, rgba(255,255,255,.7));
+  /* Volume de verre soufflé : lumière douce sur le haut du bombé, lueur sur le bas, ombre sous le bord, sans arête */
+  --glass-light: inset 0 2px 3px rgba(255,255,255,.4), inset 0 10px 16px -8px rgba(255,255,255,.28),
+                 inset 0 -8px 16px -6px rgba(255,255,255,.16), inset 0 -2px 4px rgba(0,0,30,.22),
+                 0 14px 30px rgba(2,4,24,.3);
+  --glass-gloss: radial-gradient(75% 60% at 30% -8%, rgba(255,255,255,.34), transparent 62%),
+                 radial-gradient(65% 45% at 75% 112%, rgba(255,255,255,.18), transparent 70%);
   --frost: blur(10px) saturate(170%);
   color-scheme: dark;
 }
-[data-skin="verre"] body { background: var(--bg); text-shadow: 0 1px 2px rgba(4,6,30,.55), 0 0 10px rgba(4,6,30,.25); }   /* lisible sans voiler le verre */
+[data-skin="verre"] body { background: var(--bg); text-shadow: 0 1px 2px rgba(4,6,30,.65), 0 0 12px rgba(4,6,30,.35); }   /* lisible sans voiler le verre */
 
 /* Le fond */
 .backdrop { display: none; }
 [data-skin="verre"] .backdrop { display: block; position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: #0a0f2c; }
-[data-skin="verre"] .backdrop i { position: absolute; border-radius: 50%; filter: blur(8px); will-change: transform; animation: drift 26s ease-in-out infinite alternate; }
-[data-skin="verre"] .backdrop i:nth-child(1) { width: 95vmax; height: 95vmax; left: -45vmax; top: -40vmax; background: radial-gradient(circle at 60% 60%, #4f8bff, #2b2fc9 52%, transparent 60%); }
-[data-skin="verre"] .backdrop i:nth-child(2) { width: 80vmax; height: 80vmax; right: -40vmax; top: 10vh; background: radial-gradient(circle at 40% 45%, #ffa36b, #ff4f84 52%, transparent 60%); animation-duration: 32s; animation-delay: -8s; }
-[data-skin="verre"] .backdrop i:nth-child(3) { width: 85vmax; height: 85vmax; left: -30vmax; bottom: -45vmax; background: radial-gradient(circle at 50% 40%, #b06bff, #5a2bd6 54%, transparent 62%); animation-duration: 38s; animation-delay: -15s; }
-[data-skin="verre"] .backdrop i:nth-child(4) { width: 50vmax; height: 50vmax; right: -15vmax; bottom: 5vh; background: radial-gradient(circle at 50% 50%, #3ff0d9, #1aa3c4 54%, transparent 62%); animation-duration: 29s; animation-delay: -4s; }
+/* Des disques de couleur aux bords nets (aucun flou) : sous les cartes, leurs contours se courbent et s'irisent. */
+[data-skin="verre"] .backdrop i { position: absolute; border-radius: 50%; will-change: transform; animation: drift 26s ease-in-out infinite alternate; }
+[data-skin="verre"] .backdrop i:nth-child(1) { width: 90vmax; height: 90vmax; left: -42vmax; top: -38vmax; background: radial-gradient(circle at 62% 64%, #7aa6ff, #3a52e6 45%, #2a2bb8 70%); }
+[data-skin="verre"] .backdrop i:nth-child(2) { width: 72vmax; height: 72vmax; right: -38vmax; top: 12vh; background: radial-gradient(circle at 35% 40%, #ffb27d, #ff5d86 55%, #e23a78 75%); animation-duration: 32s; animation-delay: -8s; }
+[data-skin="verre"] .backdrop i:nth-child(3) { width: 80vmax; height: 80vmax; left: -30vmax; bottom: -44vmax; background: radial-gradient(circle at 50% 35%, #c58bff, #7a3cf0 50%, #5222c4 75%); animation-duration: 38s; animation-delay: -15s; }
+[data-skin="verre"] .backdrop i:nth-child(4) { width: 46vmax; height: 46vmax; right: -14vmax; bottom: 6vh; background: radial-gradient(circle at 40% 35%, #7ff8e8, #1fc7c9 55%, #138fb0 80%); animation-duration: 29s; animation-delay: -4s; }
+[data-skin="verre"] .backdrop i:nth-child(5) { width: 22vmax; height: 22vmax; left: 8vw; top: 48vh; background: radial-gradient(circle at 35% 30%, #ffb27a, #ff7a3d 60%, #e0551f); animation-duration: 21s; animation-delay: -6s; }
+[data-skin="verre"] .backdrop i:nth-child(6) { width: 14vmax; height: 14vmax; right: 18vw; top: 6vh; background: radial-gradient(circle at 35% 30%, #b8fff0, #3fe0c5 60%, #1aa9a0); animation-duration: 24s; animation-delay: -12s; }
 @keyframes drift { to { transform: translate3d(8vw, 6vh, 0) scale(1.12) rotate(18deg); } }
 
 /* La plaque de verre */
@@ -329,12 +335,10 @@ body.sheet-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
   background: var(--glass-shine), var(--glass-fill); border: 0; box-shadow: var(--glass-light);
   -webkit-backdrop-filter: var(--frost); backdrop-filter: var(--frost);
 }
-/* L'arête : un liseré de 1 px, très clair en haut à gauche et en bas à droite */
+/* Les reflets du bombé : une tache allongée en haut, une lueur en bas (lumière qui traverse le verre) */
 [data-skin="verre"] :is(.rows li, .card, .pill, .iconbtn, .skin, .pad button, .datebox, .mic, .btn.ghost, .bigcta, .tabs, .toast)::after {
-  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
-  background: var(--glass-edge);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: var(--glass-gloss); mix-blend-mode: screen;
 }
 
 /* En-tête : une bande de verre clair, la liste se réfracte dessous en défilant */
