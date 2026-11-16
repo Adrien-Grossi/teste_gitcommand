@@ -329,6 +329,23 @@ body.lab-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
   background: #fff; color: #0a0f2c; font-weight: 700; line-height: 22px; padding: 0; font-size: .85rem;
 }
 .lab-color button:disabled { display: none; }
+/* Pavé de lumière : la silhouette de la carte au centre, un point lumineux à glisser autour */
+.lightrow { display: flex; align-items: center; gap: 16px; }
+.lightpad {
+  position: relative; flex: none; width: 170px; height: 170px; border-radius: 18px; cursor: crosshair; touch-action: none;
+  background: radial-gradient(circle, rgba(255,255,255,.08) 1px, transparent 1.5px) 0 0 / 17px 17px, rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.18);
+}
+.lightpad-card { position: absolute; left: 22%; right: 22%; top: 40%; bottom: 40%; border-radius: 99px; border: 1.5px solid rgba(255,255,255,.55); background: rgba(255,255,255,.08); }
+.lightdot {
+  position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%;
+  background: radial-gradient(circle, #fff, #ffe7b8 45%, rgba(255,200,120,0) 72%); box-shadow: 0 0 18px 6px rgba(255,230,180,.55);
+}
+.lightdot.behind { opacity: .55; box-shadow: 0 0 10px 3px rgba(255,230,180,.35); }   /* derrière la carte : plus discret */
+.lightcolor { display: grid; gap: 6px; font-size: .9rem; justify-items: start; }
+.lightcolor input[type="color"] { width: 46px; height: 46px; min-height: 0; padding: 0; border: 2px solid rgba(255,255,255,.6); border-radius: 50%; background: none; cursor: pointer; }
+.lightcolor input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.lightcolor input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 50%; }
 
 /* 8. Style Verre (sombre) -----------------------------------------------
    Inspiré du Liquid Glass d'Apple : des plaques presque claires, sans effet fumée.

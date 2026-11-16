@@ -43,7 +43,9 @@
   const glass = {
     colors: ["#293dd9", "#8040f2", "#ff5c8c", "#ff8f4d", "#1ac7cc"],
     complexity: 3, size: 1, fusion: 0.24, lace: 0.4, speed: 1,
-    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, light: 1
+    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, light: 1, round: 1,
+    // lumière : position autour de la carte (x gauche→droite, y haut→bas, z derrière→devant, de -1 à 1)
+    lightX: -0.35, lightY: -0.6, lightZ: -0.55, lightPower: 0.6, lightSharp: 0.5, lightColor: "#fff4e6"
   };
   function setGlass(p) {
     Object.assign(glass, p);
@@ -362,7 +364,8 @@
       "uniform vec2 res; uniform float t, scroll, oct, warp, size, fusion, lace, ncol, px;",
       "uniform vec3 cols[8];",
       "uniform vec4 cards[" + MAX_CARDS + "]; uniform float crad[" + MAX_CARDS + "]; uniform float ncard;",
-      "uniform float gZoom, gBezel, gDisp, gFrost, gLight;",
+      "uniform float gZoom, gBezel, gDisp, gFrost, gLight, gRound, gLightPow, gSharp;",
+      "uniform vec3 gLightDir, gLightCol;",
       "float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }",
       "float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);",
       "  return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }",
@@ -395,7 +398,7 @@
       "  vec4 b = vec4(0.0); float rad = 0.0; bool hit = false;",
       "  for (int j = 0; j < " + MAX_CARDS + "; j++){",
       "    if (float(j) >= ncard) break;",
-      "    vec2 hs = cards[j].zw * 0.5; float rj = min(hs.x, hs.y);",   // forme de galet
+      "    vec2 hs = cards[j].zw * 0.5; float rj = mix(min(6.0, min(hs.x, hs.y)), min(hs.x, hs.y), gRound);",   // arrondi réglable, jusqu'au galet
       "    if (rr(pc - cards[j].xy - hs, hs, rj) < 1.0){ b = cards[j]; rad = rj; hit = true; }",
       "  }",
       "  if (!hit){ gl_FragColor = vec4(base, 1.0); return; }",
@@ -430,6 +433,19 @@
       // Le verre absorbe un peu là où il est épais ; la lumière du fond qui voyage dans le verre
       // ressort tout au bord, en un liseré très fin de sa propre couleur.
       "  col *= 1.0 - 0.05 * bevel(inside, zR) / zR;",
+      // La lumière réglée dans l'atelier (direction de la carte vers la lumière ; x droite, y bas, z vers l'œil).
+      "  vec3 Ld = normalize(gLightDir), V = vec3(0.0, 0.0, 1.0);",
+      "  float shin = mix(3.0, 120.0, gSharp * gSharp);",
+      // devant : la lumière se reflète sur la surface courbe (Blinn-Phong)
+      "  float lit = pow(max(dot(N, normalize(Ld + V)), 0.0), shin) * max(Ld.z, 0.0) * 1.3;",
+      // derrière : elle entre par l'arrière plat, traverse le verre, ressort par l'avant courbe ;
+      // on la voit là où la courbe la renvoie vers l'œil (réfraction exacte, réflexion totale incluse)
+      "  vec3 Din = refract(-Ld, vec3(0.0, 0.0, -1.0), 1.0 / 1.5);",
+      "  vec3 Dout = refract(Din, -N, 1.5);",
+      "  lit += pow(max(dot(Dout, V), 0.0), shin * 0.6) * max(-Ld.z, 0.0) * 0.45;",   // à travers le verre : moins fort qu'un reflet direct
+      // sur le côté : un éclat rasant sur la tranche tournée vers la lumière
+      "  lit += pow(max(dot(N.xy, normalize(Ld.xy + 1e-4)), 0.0), 2.0) * pow(1.0 - N.z, 1.5) * (1.0 - abs(Ld.z)) * 1.3;",
+      "  col += gLightCol * lit * gLightPow;",
       "  col += col * exp(-inside / 1.4) * 0.45 * gLight;",
       "  gl_FragColor = vec4(mix(base, col, 1.0 - smoothstep(-0.8, 0.6, sd)), 1.0);",   // bord lissé
       "}"
@@ -465,7 +481,7 @@
       gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       this.u = {};
       for (const name of ["res", "t", "scroll", "oct", "warp", "size", "fusion", "lace", "ncol", "px", "cols", "cards", "crad", "ncard",
-        "gZoom", "gBezel", "gDisp", "gFrost", "gLight"]) this.u[name] = gl.getUniformLocation(prog, name);
+        "gZoom", "gBezel", "gDisp", "gFrost", "gLight", "gRound", "gLightPow", "gSharp", "gLightDir", "gLightCol"]) this.u[name] = gl.getUniformLocation(prog, name);
       Object.assign(this, { canvas, gl });
       this.onResize = () => {
         const k = 0.85;  // un peu sous la résolution de l'écran : les bords du verre restent nets, le téléphone respire
@@ -519,7 +535,11 @@
       gl.uniform3fv(u.cols, rgb);
       gl.uniform4fv(u.cards, boxes); gl.uniform1fv(u.crad, radii); gl.uniform1f(u.ncard, n);
       gl.uniform1f(u.gZoom, glass.zoom); gl.uniform1f(u.gBezel, glass.bezel); gl.uniform1f(u.gDisp, glass.diffraction);
-      gl.uniform1f(u.gFrost, glass.frost); gl.uniform1f(u.gLight, glass.light);
+      gl.uniform1f(u.gFrost, glass.frost); gl.uniform1f(u.gLight, glass.light); gl.uniform1f(u.gRound, glass.round);
+      gl.uniform3f(u.gLightDir, glass.lightX, glass.lightY, glass.lightZ);
+      const lc = parseInt(glass.lightColor.slice(1), 16);
+      gl.uniform3f(u.gLightCol, (lc >> 16 & 255) / 255, (lc >> 8 & 255) / 255, (lc & 255) / 255);
+      gl.uniform1f(u.gLightPow, glass.lightPower); gl.uniform1f(u.gSharp, glass.lightSharp);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     },
     stop() {

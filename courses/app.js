@@ -62,7 +62,9 @@
   const GLASS_DEFAULTS = {
     colors: ["#293dd9", "#8040f2", "#ff5c8c", "#ff8f4d", "#1ac7cc"],
     complexity: 3, size: 1, fusion: 0.24, lace: 0.4, speed: 1,
-    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, light: 1
+    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, light: 1, round: 1,
+    // lumière : position autour de la carte (x gauche→droite, y haut→bas, z derrière→devant, de -1 à 1)
+    lightX: -0.35, lightY: -0.6, lightZ: -0.55, lightPower: 0.6, lightSharp: 0.5, lightColor: "#fff4e6"
   };
   const copyGlass = (g) => ({ ...g, colors: g.colors.slice() });
   const state = { marks: {}, dates: {}, custom: [], tab: "courses", skin: "carnet", glass: copyGlass(GLASS_DEFAULTS), v: 3 };
@@ -93,6 +95,8 @@
     const colors = Array.isArray(g.colors) ? g.colors.filter((c) => /^#[0-9a-f]{6}$/i.test(c)).slice(0, 8) : [];
     if (colors.length >= 2) out.colors = colors;
     for (const c of GLASS_SLIDERS) if (typeof g[c.key] === "number") out[c.key] = Math.min(c.max, Math.max(c.min, g[c.key]));
+    for (const k of ["lightX", "lightY"]) if (typeof g[k] === "number") out[k] = Math.min(1, Math.max(-1, g[k]));
+    if (/^#[0-9a-f]{6}$/i.test(g.lightColor)) out.lightColor = g.lightColor;
     return out;
   }
   function save() {
@@ -748,10 +752,14 @@
     { group: "labGlass", key: "bezel", label: "Bombé des bords", min: 0, max: 2, step: 0.05, show: (v) => (v ? pct(v) : "plat") },
     { group: "labGlass", key: "diffraction", label: "Diffraction (arc-en-ciel)", min: 0, max: 1, step: 0.02, show: (v) => (v ? pct(v) : "aucune") },
     { group: "labGlass", key: "frost", label: "Verre fumé", min: 0, max: 1, step: 0.02, show: (v) => (v ? pct(v) : "clair") },
-    { group: "labGlass", key: "light", label: "Lumière des bords", min: 0, max: 2, step: 0.05, show: (v) => (v ? pct(v) : "éteinte") }
+    { group: "labGlass", key: "light", label: "Lumière des bords", min: 0, max: 2, step: 0.05, show: (v) => (v ? pct(v) : "éteinte") },
+    { group: "labGlass", key: "round", label: "Arrondi des cartes", min: 0, max: 1, step: 0.02, show: (v) => (v > 0.97 ? "galet" : v < 0.03 ? "coins vifs" : pct(v)) },
+    { group: "labLight", key: "lightZ", label: "Devant ↔ derrière", min: -1, max: 1, step: 0.02, show: (v) => (v < -0.2 ? "derrière la carte" : v > 0.2 ? "devant la carte" : "sur le côté") },
+    { group: "labLight", key: "lightPower", label: "Intensité de la lumière", min: 0, max: 2, step: 0.05, show: (v) => (v ? pct(v) : "éteinte") },
+    { group: "labLight", key: "lightSharp", label: "Netteté du reflet", min: 0, max: 1, step: 0.02, show: (v) => (v < 0.2 ? "diffus" : v > 0.8 ? "piqué" : pct(v)) }
   ];
   const EXTRA_COLORS = ["#ffd25e", "#5fd6a8", "#ff4f6d", "#4cc9ff", "#c7f464", "#ffffff", "#ff9ff3", "#2e2a6b"];
-  for (const group of ["labBg", "labGlass"]) {
+  for (const group of ["labBg", "labGlass", "labLight"]) {
     $(group).innerHTML = GLASS_SLIDERS.filter((c) => c.group === group).map((c) =>
       '<label class="lab-row" for="lab-' + c.key + '"><span>' + c.label + ' <output id="labOut-' + c.key + '"></output></span>' +
       '<input type="range" id="lab-' + c.key + '" data-key="' + c.key + '" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '"></label>').join("");
@@ -763,7 +771,24 @@
       '<button type="button" data-rm="' + i + '" aria-label="Retirer la couleur ' + (i + 1) + '"' + (n <= 2 ? " disabled" : "") + ">×</button></span>").join("") +
       (n < 8 ? '<button class="pill" type="button" data-add>+ Couleur</button>' : "");
     for (const c of GLASS_SLIDERS) { $("lab-" + c.key).value = g[c.key]; $("labOut-" + c.key).textContent = c.show(g[c.key]); }
+    drawLightPad();
+    $("labLightColor").value = g.lightColor;
   }
+  // Pavé de lumière : on glisse le point autour de la silhouette de la carte (gauche/droite, haut/bas).
+  function drawLightPad() {
+    const dot = $("lightDot");
+    dot.style.left = (state.glass.lightX + 1) * 50 + "%";
+    dot.style.top = (state.glass.lightY + 1) * 50 + "%";
+    dot.classList.toggle("behind", state.glass.lightZ < -0.2);
+  }
+  function moveLight(e) {
+    const r = $("lightPad").getBoundingClientRect();
+    state.glass.lightX = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1));
+    state.glass.lightY = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1));
+    drawLightPad(); pushGlass();
+  }
+  $("lightPad").addEventListener("pointerdown", (e) => { $("lightPad").setPointerCapture(e.pointerId); moveLight(e); });
+  $("lightPad").addEventListener("pointermove", (e) => { if (e.buttons) moveLight(e); });
   let labSaveTimer = 0;
   function pushGlass() {
     fx("setGlass", state.glass);
@@ -775,7 +800,9 @@
       const c = GLASS_SLIDERS.find((x) => x.key === t.dataset.key);
       state.glass[c.key] = +t.value;
       $("labOut-" + c.key).textContent = c.show(+t.value);
+      if (c.key === "lightZ") drawLightPad();
     } else if (t.dataset.ci) state.glass.colors[+t.dataset.ci] = t.value;
+    else if (t.id === "labLightColor") state.glass.lightColor = t.value;
     else return;
     pushGlass();
   });
