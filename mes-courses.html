@@ -179,6 +179,10 @@ input, select, textarea {
 .dlc { display: block; font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .dlc.warn { color: var(--warn); font-weight: 700; }
 .dlc.bad { color: var(--bad); font-weight: 700; }
+.tag-exp {
+  display: inline-block; margin-top: 4px; font-size: .8rem; font-weight: 700; line-height: 1.25;
+  background: var(--bad); color: var(--bg); padding: 3px 8px; border-radius: 6px;
+}
 #urgent { margin-top: 22px; }
 #urgent .side { color: var(--ok); }
 
@@ -224,6 +228,12 @@ input, select, textarea {
 .nav { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 8px; margin-top: auto; }
 .btn:disabled { opacity: .35; cursor: default; }
 .btn.go { background: var(--ok); border-color: var(--ok); color: var(--bg); }
+.btn.go.auto {
+  background-image: linear-gradient(var(--hl), var(--hl)); background-repeat: no-repeat;
+  background-size: 0 100%; animation: fill 1.6s linear forwards; color: var(--hl-ink);
+}
+@keyframes fill { to { background-size: 100% 100%; } }
+.datebox { cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
@@ -243,6 +253,7 @@ input, select, textarea {
     <div class="toggles">
       <button class="pill" id="hideBtn" type="button" aria-pressed="true">Cacher ce qui est fait</button>
       <button class="pill accent" id="datesBtn" type="button">Dater le stock</button>
+      <button class="pill" id="notifBtn" type="button" hidden>Activer les rappels</button>
     </div>
   </header>
 
@@ -296,8 +307,10 @@ input, select, textarea {
     </div>
     <div class="datebox" id="lbDate" aria-live="polite"></div>
     <p class="preview" id="lbPreview"></p>
-    <label class="item-sub" for="lbDictate">Dicter : touche le champ, puis le micro de ton clavier. Dis « 26 juin », puis la touche Suivant ou Entrée du clavier.</label>
-    <input id="lbDictate" type="text" enterkeyhint="next" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Touche ici, puis le micro du clavier">
+    <div id="lbKbd" hidden>
+      <label class="item-sub" for="lbDictate">Micro indisponible ici : touche le champ, puis le micro de ton clavier, et dis « 26 juin ».</label>
+      <input id="lbDictate" type="text" enterkeyhint="next" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Touche ici, puis le micro du clavier">
+    </div>
     <button class="mic" id="lbMic" type="button" hidden>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
       <span id="lbMicText">Dire la date</span>
@@ -379,7 +392,7 @@ input, select, textarea {
   var KEY = "courses-v1";
   var state = { marks: {}, custom: [], hideDone: true, dates: {} };
   try { var saved = JSON.parse(localStorage.getItem(KEY)); if (saved) state = Object.assign(state, saved); } catch (e) {}
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} syncForReminders(); }
 
   function slug(s) { return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-"); }
 
@@ -404,6 +417,7 @@ input, select, textarea {
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
 
   function render() {
+    if (applyExpiry()) save();
     var all = aisles(), total = 0, handled = 0, current = null, html = "";
     all.forEach(function (a) {
       var left = a.items.filter(function (it) { return !state.marks[it.id]; }).length;
@@ -473,11 +487,15 @@ input, select, textarea {
     }
     var next = prev === act ? undefined : act;
     if (next) state.marks[id] = next; else delete state.marks[id];
+    // Un article périmé qu'on reprend (ou dont on n'a plus besoin) perd sa vieille date.
+    var prevDate = state.dates[id];
+    if (next && validISO(prevDate) && daysLeft(prevDate) < 0) delete state.dates[id];
     save();
     try { if (navigator.vibrate) navigator.vibrate(next === "got" ? 15 : 8); } catch (err) {}
     if (next) {
       showToast((next === "got" ? "Pris : " : "Pas besoin : ") + findName(id), function () {
         if (prev) state.marks[id] = prev; else delete state.marks[id];
+        if (prevDate !== undefined) state.dates[id] = prevDate;
       });
     }
     if (next && state.hideDone) {
@@ -531,7 +549,8 @@ input, select, textarea {
       navigator.wakeLock.request("screen").then(function (l) { lock = l; l.addEventListener("release", function () { lock = null; }); }).catch(function () {});
     } catch (e) {}
   }
-  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") wake(); });
+  // Au retour sur l'appli (par ex. le lendemain), on recalcule les dates dépassées.
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") { wake(); render(); checkReminders(); } });
   wake();
 
   // ---------- Dates de péremption ----------
@@ -546,9 +565,20 @@ input, select, textarea {
   function rel(n) { return n < 0 ? "périmé depuis " + (-n) + " j" : n === 0 ? "aujourd'hui" : n === 1 ? "demain" : "dans " + n + " j"; }
   function shortDate(s) { var p = s.split("-"); return p[2] + "/" + p[1] + (+p[0] !== new Date().getFullYear() ? "/" + p[0].slice(2) : ""); }
 
+  // Date dépassée : l'article sort du stock et revient dans la liste à racheter.
+  function applyExpiry() {
+    var changed = false;
+    Object.keys(state.dates).forEach(function (id) {
+      var d = state.dates[id];
+      if (validISO(d) && daysLeft(d) < 0 && state.marks[id]) { delete state.marks[id]; changed = true; }
+    });
+    return changed;
+  }
+
   function dlcHtml(id) {
     var d = state.dates[id]; if (!validISO(d)) return "";
     var n = daysLeft(d);
+    if (n < 0) return '<span class="tag-exp">Attention, date de péremption dépassée (' + shortDate(d) + ') · à racheter</span>';
     return '<span class="dlc ' + (n < 0 ? "bad" : n <= 2 ? "warn" : "") + '">À consommer : ' + shortDate(d) + " · " + rel(n) + "</span>";
   }
 
@@ -611,8 +641,12 @@ input, select, textarea {
     var b = e.target.closest("button[data-act]"); if (!b) return;
     var id = b.closest("li").getAttribute("data-id");
     if (b.getAttribute("data-act") === "edit") { openLabeler([id]); return; }
-    var prev = state.dates[id]; delete state.dates[id]; save(); render();
-    showToast("Fini : " + findName(id), function () { state.dates[id] = prev; });
+    // Fini (mangé ou jeté) : plus de date, et l'article revient dans la liste à racheter.
+    var prev = state.dates[id], prevMark = state.marks[id];
+    delete state.dates[id]; delete state.marks[id]; save(); render();
+    showToast("Fini : " + findName(id) + " · remis dans la liste", function () {
+      state.dates[id] = prev; if (prevMark) state.marks[id] = prevMark;
+    });
   });
 
   // Mode étiquetage : un article à la fois.
@@ -634,12 +668,13 @@ input, select, textarea {
   }
   function openLabeler(ids) {
     if (!ids.length) { showToast("Rien à dater : coche d'abord ce que tu as acheté ou déjà à la maison.", null); return; }
-    lb.queue = ids; lb.pos = 0; lb.saved = 0;
+    lb.queue = ids; lb.pos = 0; lb.saved = 0; lb.misses = 0;
+    lb.voice = !!SR; // mains libres : le micro s'ouvre tout seul
     sheet.hidden = false; document.body.style.overflow = "hidden";
     showItem();
   }
   function closeLabeler() {
-    stopListening(); sheet.hidden = true; document.body.style.overflow = "";
+    cancelAuto(); stopListening(); sheet.hidden = true; document.body.style.overflow = "";
     save(); render();
     if (lb.saved) showToast(lb.saved + (lb.saved > 1 ? " dates enregistrées" : " date enregistrée"), null);
   }
@@ -651,9 +686,22 @@ input, select, textarea {
     $("lbName").textContent = info.name + (info.qty ? " · " + info.qty : "");
     $("lbCurrent").textContent = validISO(d) ? "Date actuelle : " + shortDate(d) + " (" + rel(daysLeft(d)) + ")" : "";
     $("lbPrev").disabled = lb.pos === 0;
-    lb.buf = ""; lb.msg = ""; $("lbDictate").value = ""; drawDate();
+    cancelAuto(); lb.buf = ""; lb.msg = ""; $("lbDictate").value = ""; drawDate();
     if (lb.voice) listen();
   }
+  // Date entendue : validation automatique après 1,6 s, sauf si on touche pour corriger.
+  var AUTO_MS = 1600;
+  function armAuto(iso) {
+    cancelAuto();
+    var ok = $("lbOk"); ok.classList.add("auto"); ok.textContent = "Validation…";
+    $("lbPreview").textContent += " · touche la date pour corriger";
+    lb.autoT = setTimeout(function () { lb.autoT = null; setDate(iso); }, AUTO_MS);
+  }
+  function cancelAuto() {
+    if (lb.autoT) { clearTimeout(lb.autoT); lb.autoT = null; }
+    var ok = $("lbOk"); ok.classList.remove("auto"); ok.textContent = "Valider";
+  }
+  $("lbDate").addEventListener("click", function () { if (lb.autoT) { cancelAuto(); stopListening(); drawDate(); } });
   function drawDate() {
     var b = lb.buf, slots = b.length > 4 ? 6 : 4, h = "";
     for (var i = 0; i < slots; i++) {
@@ -671,13 +719,15 @@ input, select, textarea {
     else { pv.className = "preview"; pv.textContent = "Jour puis mois : 2606 pour le 26 juin"; }
   }
   function setDate(iso) {
+    cancelAuto();
     var id = lb.queue[lb.pos];
     state.dates[id] = iso; if (iso !== "none") lb.saved++;
     save(); try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
     lb.pos++; showItem();
   }
   function press(k) {
-    lb.voice = false; stopListening(); lb.msg = ""; $("lbDictate").value = "";
+    // Correction à la main pour cet article ; le micro reprend tout seul à l'article suivant.
+    cancelAuto(); stopListening(); lb.msg = ""; $("lbDictate").value = "";
     if (k === "del") lb.buf = lb.buf.slice(0, -1);
     else if (k === "clr") lb.buf = "";
     else if (lb.buf.length < 6) lb.buf += k;
@@ -686,8 +736,10 @@ input, select, textarea {
   $("datesBtn").addEventListener("click", function () { openLabeler(stockQueue()); });
   $("lbPad").addEventListener("click", function (e) { var k = e.target.closest("button"); if (k) press(k.getAttribute("data-k")); });
   $("lbOk").addEventListener("click", function () { var iso = bufToISO(lb.buf); if (iso) setDate(iso); });
-  $("lbSkip").addEventListener("click", function () { lb.pos++; showItem(); });
-  $("lbPrev").addEventListener("click", function () { if (lb.pos > 0) { lb.pos--; showItem(); } });
+  function skipItem() { lb.pos++; showItem(); }
+  function prevItem() { if (lb.pos > 0) { lb.pos--; showItem(); } else if (lb.voice) listen(); }
+  $("lbSkip").addEventListener("click", skipItem);
+  $("lbPrev").addEventListener("click", prevItem);
   $("lbClose").addEventListener("click", closeLabeler);
   $("lbChips").addEventListener("click", function (e) {
     var c = e.target.closest("button"); if (!c) return;
@@ -705,34 +757,59 @@ input, select, textarea {
 
   // Dictée : reconnaissance vocale du navigateur, sans bibliothèque.
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition, rec = null, listening = false;
-  if (SR) $("lbMic").hidden = false;
-  function setMic(on) { listening = on; $("lbMic").classList.toggle("on", on); $("lbMicText").textContent = on ? "J'écoute… dis la date" : "Dire la date"; }
+  if (SR) $("lbMic").hidden = false; else $("lbKbd").hidden = false;
+  function setMic(on) {
+    listening = on; $("lbMic").classList.toggle("on", on);
+    $("lbMicText").textContent = on ? "J'écoute… dis la date" : lb.voice ? "Dire la date" : "Micro en pause · toucher pour reprendre";
+  }
   function stopListening() { var r = rec; rec = null; if (r) { try { r.abort(); } catch (e) {} } setMic(false); }
+  function norm(s) { return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
+  // Commandes vocales en plus des dates.
+  function voiceCommand(said) {
+    var t = norm(said);
+    if (/(pas|sans|aucune) (de )?date|pas besoin|ne perime pas/.test(t)) { setDate("none"); return true; }
+    if (/\b(passe|passer|suivant)\b/.test(t)) { skipItem(); return true; }
+    if (/\b(retour|precedent)\b/.test(t)) { prevItem(); return true; }
+    if (/\b(stop|termine|arrete|c'est fini)\b/.test(t)) { closeLabeler(); return true; }
+    return false;
+  }
   function listen() {
     stopListening();
+    if (!SR || sheet.hidden) return;
     var r; try { r = new SR(); } catch (e) { return; }
-    rec = r; r.lang = "fr-FR"; r.interimResults = false; r.maxAlternatives = 5;
+    rec = r; lb.relisten = false; r.lang = "fr-FR"; r.interimResults = false; r.maxAlternatives = 5;
     r.onresult = function (ev) {
+      if (rec !== r) return;
       var alts = ev.results[0], iso = null, said = alts[0].transcript;
-      for (var i = 0; i < alts.length && !iso; i++) iso = parseSpoken(alts[i].transcript);
-      if (iso) { lb.voice = true; lb.buf = isoToBuf(iso); lb.msg = ""; }
-      else { lb.buf = ""; lb.msg = "Pas compris « " + said + " ». Redis, par exemple « 26 06 »."; }
-      drawDate();
+      lb.misses = 0;
+      for (var i = 0; i < alts.length; i++) if (voiceCommand(alts[i].transcript)) return;
+      for (i = 0; i < alts.length && !iso; i++) iso = parseSpoken(alts[i].transcript);
+      if (iso) { lb.buf = isoToBuf(iso); lb.msg = ""; drawDate(); armAuto(iso); }
+      else { lb.buf = ""; lb.msg = "Pas compris « " + said + " ». Redis, par exemple « 26 juin »."; lb.relisten = true; drawDate(); }
     };
     r.onerror = function (ev) {
+      if (rec !== r) return;
       if (ev.error === "not-allowed" || ev.error === "service-not-allowed" || ev.error === "audio-capture") {
-        // Le navigateur refuse son micro (fréquent sur un fichier ou dans la page en ligne) : on passe au micro du clavier.
-        lb.voice = false; lb.msg = "Le micro du navigateur est bloqué ici. Utilise le champ « Dicter » avec le micro du clavier.";
-        $("lbMic").hidden = true; SR = null;
-        try { $("lbDictate").focus(); } catch (e) {}
-      } else if (ev.error === "no-speech") { lb.msg = "Je n'ai rien entendu. Appuie sur le micro et dis la date."; }
-      else if (ev.error !== "aborted") { lb.msg = "Le micro n'a pas marché. Tape la date."; }
+        lb.voice = false; lb.msg = "Le micro est bloqué ici. Ouvre l'appli installée sur l'écran d'accueil, ou tape la date.";
+        $("lbMic").hidden = true; $("lbKbd").hidden = false; SR = null;
+      } else if (ev.error === "no-speech") {
+        lb.misses = (lb.misses || 0) + 1;
+        if (lb.misses < 3) lb.relisten = true;
+        else { lb.voice = false; lb.misses = 0; lb.msg = "Micro en pause. Touche le bouton micro pour reprendre."; }
+      } else if (ev.error !== "aborted") { lb.relisten = true; }
       drawDate();
     };
-    r.onend = function () { if (rec === r) { rec = null; setMic(false); } };
+    r.onend = function () {
+      if (rec !== r) return;
+      rec = null; setMic(false);
+      if (lb.relisten && lb.voice && !sheet.hidden) { lb.relisten = false; setTimeout(listen, 250); }
+    };
     try { r.start(); setMic(true); } catch (e) { rec = null; setMic(false); }
   }
-  $("lbMic").addEventListener("click", function () { if (listening) stopListening(); else listen(); });
+  $("lbMic").addEventListener("click", function () {
+    if (listening) { lb.voice = false; stopListening(); }
+    else { lb.voice = true; lb.misses = 0; cancelAuto(); listen(); }
+  });
 
   // Dictée par le clavier du téléphone : le texte arrive dans le champ, on le lit au fur et à mesure.
   var dict = $("lbDictate");
@@ -753,6 +830,71 @@ input, select, textarea {
   dict.addEventListener("focus", function () {
     setTimeout(function () { try { $("lbDate").scrollIntoView({ block: "start", behavior: "smooth" }); } catch (e) {} }, 300);
   });
+
+  // ---------- Rappels : notification 2 jours avant la date, puis quand elle est dépassée ----------
+  // Le service worker (sw.js) lit le stock daté dans IndexedDB et affiche les notifications,
+  // à l'ouverture de l'appli et environ une fois par jour en arrière-plan quand Android le permet.
+  var canNotify = false;
+  try {
+    canNotify = "serviceWorker" in navigator && "Notification" in window && "indexedDB" in window &&
+      window.isSecureContext && location.protocol !== "file:";
+  } catch (e) {}
+  function idb(fn) {
+    return new Promise(function (res, rej) {
+      var r = indexedDB.open("courses", 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore("kv"); };
+      r.onerror = function () { rej(r.error); };
+      r.onsuccess = function () {
+        var tx = r.result.transaction("kv", "readwrite"), out = fn(tx.objectStore("kv"));
+        tx.oncomplete = function () { res(out && out.result); };
+        tx.onerror = function () { rej(tx.error); };
+      };
+    });
+  }
+  function syncForReminders() {
+    if (!canNotify) return Promise.resolve();
+    var list = [];
+    aisles().forEach(function (a) { a.items.forEach(function (it) {
+      var d = state.dates[it.id]; if (validISO(d)) list.push({ id: it.id, name: it.name, date: d });
+    }); });
+    try { return idb(function (s) { return s.put(list, "stock"); }).catch(function () {}); } catch (e) { return Promise.resolve(); }
+  }
+  function registerDaily() {
+    try {
+      navigator.serviceWorker.ready.then(function (reg) {
+        if (!reg.periodicSync) return;
+        return navigator.permissions.query({ name: "periodic-background-sync" }).then(function (st) {
+          if (st.state === "granted") return reg.periodicSync.register("check-dates", { minInterval: 12 * 3600 * 1000 });
+        });
+      }).catch(function () {});
+    } catch (e) {}
+  }
+  function checkReminders() {
+    if (!canNotify || Notification.permission !== "granted") return;
+    syncForReminders().then(function () { return navigator.serviceWorker.ready; }).then(function (reg) {
+      if (reg.active) reg.active.postMessage({ type: "check" });
+    }).catch(function () {});
+  }
+  var nb = $("notifBtn");
+  function drawNotifBtn() {
+    if (!canNotify) { nb.hidden = true; return; }
+    var p = Notification.permission;
+    nb.hidden = p === "granted";
+    nb.textContent = p === "denied" ? "Rappels bloqués" : "Activer les rappels";
+  }
+  nb.addEventListener("click", function () {
+    if (Notification.permission === "denied") {
+      showToast("Rappels bloqués : autorise les notifications de l'appli dans les réglages du téléphone.", null); return;
+    }
+    Notification.requestPermission().then(function (p) {
+      drawNotifBtn();
+      if (p !== "granted") return;
+      registerDaily(); checkReminders();
+      showToast("Rappels activés : tu seras prévenu 2 jours avant une date.", null);
+    });
+  });
+  drawNotifBtn();
+  if (canNotify && Notification.permission === "granted") { registerDaily(); checkReminders(); }
 
   // ---------- Transfert entre versions (page en ligne ↔ fichier) ----------
   var PREFIX = "COURSES1:";
