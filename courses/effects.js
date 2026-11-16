@@ -43,7 +43,7 @@
   const glass = {
     colors: ["#293dd9", "#8040f2", "#ff5c8c", "#ff8f4d", "#1ac7cc"],
     complexity: 3, size: 1, fusion: 0.24, lace: 0.4, speed: 1,
-    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, light: 1, round: 1,
+    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, light: 1, round: 1, thick: 1.6, reflect: 0.8, counter: 1,
     // Sources lumineuses posées dans le fond (1 à 3) : x, y sur l'écran (0 à 1), taille et
     // profondeur derrière le verre (0 à 1), intensité (0 à 2), couleur.
     lights: [
@@ -368,13 +368,13 @@
       "uniform vec2 res; uniform float t, scroll, oct, warp, size, fusion, lace, ncol, px;",
       "uniform vec3 cols[8];",
       "uniform vec4 cards[" + MAX_CARDS + "]; uniform float crad[" + MAX_CARDS + "]; uniform float ncard;",
-      "uniform float gZoom, gBezel, gDisp, gFrost, gLight, gRound;",
+      "uniform float gZoom, gBezel, gDisp, gFrost, gLight, gRound, gThick, gReflect, gCounter;",
       "uniform vec4 lPos[3], lCol[3]; uniform float nlight;",   // sources du fond : (x, y, profondeur, rayon) en pixels CSS ; (couleur, intensité)
       "float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }",
       "float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);",
       "  return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }",
       // oct niveaux de détail : peu = grandes formes douces, beaucoup = volutes
-      "float fbm(vec2 p){ float v = 0.0, a = 0.55; for (int i = 0; i < 6; i++){ if (float(i) >= oct) break; v += a*n(p); p = p*1.9 + 1.7; a *= 0.45; } return v; }",
+      "float fbm(vec2 p){ float v = 0.0, a = 0.55; for (int i = 0; i < 8; i++){ float w = clamp(oct - float(i), 0.0, 1.0); if (w <= 0.0) break; v += a * n(p) * w; p = p*1.9 + 1.7; a *= 0.45; } return v; }",
       "vec3 pal(float i){ float k = mod(i, ncol); vec3 c = cols[0];",
       "  for (int j = 0; j < 8; j++) if (abs(float(j) - k) < 0.5) c = cols[j];",
       "  return c; }",
@@ -432,19 +432,27 @@
       "  vec3 Tg = refract(I, N, 1.0 / 1.5);",
       "  vec3 Tb = refract(I, N, 1.0 / (1.5 + 0.07 * gDisp));",
       "  vec2 zoom = -lp * (1.0 - 1.0/gZoom);",
-      "  vec2 oR = Tr.xy / max(-Tr.z, 0.25) * thick * 1.6 + zoom;",
-      "  vec2 oG = Tg.xy / max(-Tg.z, 0.25) * thick * 1.6 + zoom;",
-      "  vec2 oB = Tb.xy / max(-Tb.z, 0.25) * thick * 1.6 + zoom;",
+      // gThick : épaisseur du verre. Très épais, l'image se retourne sur le bord (pli net), comme dans un bloc de verre.
+      "  vec2 oR = Tr.xy / max(-Tr.z, 0.25) * thick * gThick + zoom;",
+      "  vec2 oG = Tg.xy / max(-Tg.z, 0.25) * thick * gThick + zoom;",
+      "  vec2 oB = Tb.xy / max(-Tb.z, 0.25) * thick * gThick + zoom;",
       "  vec3 col = vec3(bgAt(pc + oR).r, bgAt(pc + oG).g, bgAt(pc + oB).b);",
       // verre fumé : on mélange avec une moyenne autour (flou)
       "  if (gFrost > 0.01){",
-      "    vec2 sp = pc + oG; float rb = 4.0 + gFrost * 12.0;",
+      "    vec2 sp = pc + oG; float rb = 4.0 + gFrost * 12.0;",   // le flou continue d'augmenter au-delà de 100 %
       "    vec3 bl = (bgAt(sp + vec2(rb, 0.0)) + bgAt(sp - vec2(rb, 0.0)) + bgAt(sp + vec2(0.0, rb)) + bgAt(sp - vec2(0.0, rb))) * 0.25;",
-      "    col = mix(col, bl + 0.05, gFrost);",
+      "    col = mix(col, bl + 0.05, min(gFrost, 1.0));",
       "  }",
       // Le verre absorbe un peu là où il est épais ; la lumière du fond qui voyage dans le verre
       // ressort tout au bord, en un liseré très fin de sa propre couleur.
       "  col *= 1.0 - 0.05 * bevel(inside, zR) / zR;",
+      // Reflet du décor : sur le bord penché, le verre agit comme un miroir (Fresnel : plus on le voit
+      // en biais, plus il réfléchit). On y voit le décor de l'autre côté du bord, retourné.
+      "  vec2 nrm = N.xy / max(length(N.xy), 1e-3);",   // sens du bord, vers l'extérieur de la carte
+      "  float rimK = 1.0 - N.z;",
+      "  float fres = 0.03 + 0.97 * pow(rimK, 2.2);",
+      "  vec3 refl = bgAt(pc + nrm * (inside * 2.0 + 5.0));",
+      "  col = mix(col, refl * 1.1 + 0.04, clamp(fres * gReflect, 0.0, 0.92));",
       // Lumière des sources du fond à travers le verre : depuis la vraie position de chaque source
       // (derrière le verre), le rayon entre par l'arrière plat, traverse, ressort par l'avant courbe.
       // On voit un éclat là où la courbe le renvoie vers l'œil — seulement sur la partie courbe
@@ -456,11 +464,21 @@
       "    vec3 L = normalize(vec3(lPos[j].xy - pc, -lPos[j].z));",
       "    vec3 Din = refract(-L, vec3(0.0, 0.0, -1.0), 1.0 / 1.5);",
       "    vec3 Dout = refract(Din, -N, 1.5);",
-      "    float glint = pow(max(dot(Dout, V), 0.0), 18.0) * curve;",
-      "    float near = 1.0 / (1.0 + pow(length(lPos[j].xy - pc) / (lPos[j].w * 4.0), 2.0));",   // plus faible quand la source est loin
+      "    float glint = pow(max(dot(Dout, V), 0.0), 28.0) * curve;",
+      "    vec2 toL = lPos[j].xy - pc; float dl = length(toL);",
+      "    float near = 1.0 / (1.0 + pow(dl / (lPos[j].w * 4.0), 2.0));",   // plus faible quand la source est loin
       "    col = 1.0 - (1.0 - col) * (1.0 - clamp(lCol[j].rgb * lCol[j].a * glint * near * 1.2 * gLight, 0.0, 1.0));",
+      // Contre-reflet : la lumière qui entre d'un côté du verre ressort de l'autre. Sur le bord OPPOSÉ
+      // à la source : un fin liseré net très lumineux contre le bord, et juste à l'intérieur une
+      // bande sombre nette (l'ombre inverse), comme sur du verre épais.
+      "    float opp = smoothstep(0.0, 0.85, -dot(nrm, toL / max(dl, 1.0))) * smoothstep(0.02, 0.25, rimK);",
+      "    float line = exp(-pow((inside - 1.8) / 1.0, 2.0));",
+      "    float dark = exp(-pow((inside - 5.5) / 2.0, 2.0));",
+      "    float pw = clamp(lCol[j].a, 0.0, 1.0);",
+      "    col *= 1.0 - 0.42 * dark * opp * near * pw * gCounter;",
+      "    col = 1.0 - (1.0 - col) * (1.0 - clamp(lCol[j].rgb * lCol[j].a * line * opp * near * 1.8 * gCounter, 0.0, 1.0));",
       "  }",
-      "  col += col * exp(-inside / 1.4) * 0.45 * gLight;",
+      "  col += col * exp(-inside / 0.9) * 0.3 * gLight;",
       "  gl_FragColor = vec4(mix(base, col, 1.0 - smoothstep(-0.8, 0.6, sd)), 1.0);",   // bord lissé
       "}"
     ].join("\n"),
@@ -495,7 +513,7 @@
       gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       this.u = {};
       for (const name of ["res", "t", "scroll", "oct", "warp", "size", "fusion", "lace", "ncol", "px", "cols", "cards", "crad", "ncard",
-        "gZoom", "gBezel", "gDisp", "gFrost", "gLight", "gRound", "lPos", "lCol", "nlight"]) this.u[name] = gl.getUniformLocation(prog, name);
+        "gZoom", "gBezel", "gDisp", "gFrost", "gLight", "gRound", "gThick", "gReflect", "gCounter", "lPos", "lCol", "nlight"]) this.u[name] = gl.getUniformLocation(prog, name);
       Object.assign(this, { canvas, gl });
       this.onResize = () => {
         const k = 0.85;  // un peu sous la résolution de l'écran : les bords du verre restent nets, le téléphone respire
@@ -550,6 +568,7 @@
       gl.uniform4fv(u.cards, boxes); gl.uniform1fv(u.crad, radii); gl.uniform1f(u.ncard, n);
       gl.uniform1f(u.gZoom, glass.zoom); gl.uniform1f(u.gBezel, glass.bezel); gl.uniform1f(u.gDisp, glass.diffraction);
       gl.uniform1f(u.gFrost, glass.frost); gl.uniform1f(u.gLight, glass.light); gl.uniform1f(u.gRound, glass.round);
+      gl.uniform1f(u.gThick, glass.thick); gl.uniform1f(u.gReflect, glass.reflect); gl.uniform1f(u.gCounter, glass.counter);
       // Sources du fond : elles dérivent lentement avec les vagues (même vitesse que le fond).
       const lp = new Float32Array(12), lcol = new Float32Array(12), lights = glass.lights.slice(0, 3);
       lights.forEach((l, i) => {

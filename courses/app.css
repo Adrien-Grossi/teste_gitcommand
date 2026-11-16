@@ -318,7 +318,14 @@ body.lab-open :is(.wrap, .tabs, .toast) { visibility: hidden; }
 .lab-row output { color: var(--muted); font-variant-numeric: tabular-nums; }
 .lab input[type="range"] { min-height: 0; padding: 0; border: 0; background: none; width: 100%; height: 28px; accent-color: var(--hl); }
 .lab-colors { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.lab-color { position: relative; }
+.lab-color { position: relative; display: grid; justify-items: center; gap: 5px; }
+/* Poignée pour changer l'ordre : un petit repère à six points, sous la pastille */
+.grip {
+  width: 38px; height: 14px; border-radius: 7px; cursor: grab; touch-action: none; background:
+    radial-gradient(circle, rgba(255,255,255,.75) 1.3px, transparent 1.8px) 0 0 / 8px 7px, rgba(255,255,255,.1);
+}
+.lab-color.dragging { transform: scale(1.12); z-index: 3; filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); }
+.lab-color.dragging .grip { cursor: grabbing; }
 .lab-color input[type="color"] {
   width: 46px; height: 46px; min-height: 0; padding: 0; border: 2px solid rgba(255,255,255,.6); border-radius: 50%; cursor: pointer; background: none;
 }
