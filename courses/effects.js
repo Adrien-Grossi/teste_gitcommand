@@ -45,7 +45,7 @@
     if (reduced) return;
     load("gsap").catch(() => {});
     load("confetti").catch(() => {});
-    if (next === "verre") liquid.start(); else liquid.stop();
+    if (next === "verre") { liquid.start(); fluid.start(); } else { liquid.stop(); fluid.stop(); }
     if (scene && next !== "argile") { scene.dispose(); scene = null; }
     if (next === "argile" && !scene) {
       load("three").then(() => {
@@ -187,9 +187,13 @@
     //    puis la courbure s'adoucit vers l'intérieur (pente du profil), sans arête ;
     //  - le grossissement (zoom > 1) : tout l'intérieur montre une zone plus petite, donc agrandie.
     // range = décalage maximal en pixels, qui devient l'échelle du filtre.
-    map(w, h, r, bezel, zoom, range) {
+    // Renvoie aussi le masque de lumière : où la carte s'éclaire (bord haut surtout, bord bas un peu).
+    maps(w, h, r, bezel, zoom, range) {
       const c = document.createElement("canvas"); c.width = w; c.height = h;
       const g = c.getContext("2d"), img = g.createImageData(w, h), px = img.data;
+      const lc = document.createElement("canvas"); lc.width = w; lc.height = h;
+      const lg = lc.getContext("2d"), limg = lg.createImageData(w, h), lpx = limg.data;
+      const rim = bezel * 1.3;
       const shrink = 1 - 1 / zoom;
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
@@ -208,13 +212,17 @@
           px[i] = 128 + Math.max(-1, Math.min(1, dx / range)) * 127;
           px[i + 1] = 128 + Math.max(-1, Math.min(1, dy / range)) * 127;
           px[i + 2] = 128; px[i + 3] = 255;
+          const glow = depth < rim ? Math.pow(1 - Math.max(depth, 0) / rim, 1.6) * (oy < 0 ? 1 : 0.55) * (0.4 + 0.6 * Math.abs(ny)) : 0;
+          lpx[i] = lpx[i + 1] = lpx[i + 2] = 255; lpx[i + 3] = glow * 255;
         }
       }
-      g.putImageData(img, 0, 0);
-      return c.toDataURL();
+      g.putImageData(img, 0, 0); lg.putImageData(limg, 0, 0);
+      return { map: c.toDataURL(), light: lc.toDataURL() };
     },
-    // Un filtre par taille : trois déformations (rouge, vert, bleu) de forces différentes,
-    // recombinées ; l'écart entre elles fait les franges irisées.
+    // Un filtre par taille :
+    //  1. trois déformations (rouge, vert, bleu) de forces différentes, recombinées : franges irisées ;
+    //  2. la lumière des bords : le fond derrière la carte, adouci, saturé et éclairci, posé sur le masque
+    //     de lumière. Le halo prend donc la couleur de ce qui passe derrière (rouge derrière = halo rouge).
     filter(w, h, r, lens) {
       const id = "lg-" + w + "-" + h + "-" + r + (lens ? "-l" : "");
       if (this.filters.has(id)) return id;
@@ -237,10 +245,19 @@
       const f = document.createElementNS(SVG_NS, "filter");
       f.setAttribute("id", id);
       for (const [k, v] of Object.entries({ x: 0, y: 0, width: w, height: h, filterUnits: "userSpaceOnUse", "color-interpolation-filters": "sRGB" })) f.setAttribute(k, v);
-      f.innerHTML = '<feImage href="' + this.map(w, h, r, bezel, zoom, range) + '" x="0" y="0" width="' + w + '" height="' + h + '" preserveAspectRatio="none" result="map"/>' +
+      const m = this.maps(w, h, r, bezel, zoom, range);
+      const img = (href, result) => '<feImage href="' + href + '" x="0" y="0" width="' + w + '" height="' + h + '" preserveAspectRatio="none" result="' + result + '"/>';
+      const lift = '<feFuncR type="linear" slope="1.5" intercept="0.1"/><feFuncG type="linear" slope="1.5" intercept="0.1"/><feFuncB type="linear" slope="1.5" intercept="0.1"/>';
+      f.innerHTML = img(m.map, "map") +
         channel(0, scale) + channel(1, scale * 0.92) + channel(2, scale * 0.84) +
         '<feBlend in="c0" in2="c1" mode="screen" result="rg"/><feBlend in="rg" in2="c2" mode="screen" result="rgb"/>' +
-        '<feGaussianBlur in="rgb" stdDeviation="0.5"/>';
+        '<feGaussianBlur in="rgb" stdDeviation="0.5" result="clear"/>' +
+        img(m.light, "lightmask") +
+        '<feGaussianBlur in="SourceGraphic" stdDeviation="7" result="soft"/>' +
+        '<feColorMatrix in="soft" type="saturate" values="1.8" result="sat"/>' +
+        '<feComponentTransfer in="sat" result="bright">' + lift + '</feComponentTransfer>' +
+        '<feComposite in="bright" in2="lightmask" operator="in" result="glow"/>' +
+        '<feBlend in="glow" in2="clear" mode="screen"/>';
       this.defs.appendChild(f);
       this.filters.set(id, f);
       return id;
@@ -280,6 +297,96 @@
       this.observer.disconnect();
       removeEventListener("resize", this.onResize);
       document.querySelectorAll("[data-lg]").forEach((el) => { el.style.backdropFilter = el.style.webkitBackdropFilter = ""; delete el.dataset.lg; });
+    }
+  };
+
+  /* =====================  Fond fluide du Verre (acrylic pouring)  ========== *
+   * Des couches de couleur qui s'enroulent comme de la peinture versée, avec un fin liseré clair
+   * entre elles, et qui bougent très lentement. Courbes douces, sans flou ni arête.
+   * Calculé par la carte graphique (WebGL, sans bibliothèque), en résolution réduite et à 20 images/s
+   * pour ménager la batterie. Si WebGL manque, les disques de app.css restent en fond.          */
+  const fluid = {
+    canvas: null, gl: null, prog: null, raf: 0, last: 0, start0: 0,
+    FRAG: [
+      "precision highp float;",
+      "uniform vec2 res; uniform float t; uniform float scroll;",
+      "float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }",
+      "float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);",
+      "  return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }",
+      // 3 niveaux de détail seulement : de grandes formes douces, sans petites volutes
+      "float fbm(vec2 p){ float v = 0.0, a = 0.55; for (int i = 0; i < 3; i++){ v += a*n(p); p = p*1.9 + 1.7; a *= 0.45; } return v; }",
+      "vec3 pal(float i){ float k = mod(i, 5.0);",
+      "  if (k < 1.0) return vec3(0.16, 0.24, 0.86);",     // bleu
+      "  if (k < 2.0) return vec3(0.50, 0.25, 0.95);",     // violet
+      "  if (k < 3.0) return vec3(1.00, 0.36, 0.55);",     // corail
+      "  if (k < 4.0) return vec3(1.00, 0.56, 0.30);",     // orange
+      "  return vec3(0.10, 0.78, 0.80); }",                // turquoise
+      "void main(){",
+      "  vec2 p = (gl_FragCoord.xy - 0.5*res) / res.y * 0.9 + vec2(0.0, scroll * 0.25);",
+      "  float s = t * 0.025;",
+      // déformation en cascade (domain warping) : c'est ce qui fait les volutes de peinture
+      "  vec2 q = vec2(fbm(p + vec2(0.0, s)), fbm(p + vec2(5.2, 1.3) - s));",
+      "  vec2 r = vec2(fbm(p + 1.4*q + vec2(1.7, 9.2) + s*1.4), fbm(p + 1.4*q + vec2(8.3, 2.8) - s));",
+      "  float v = fbm(p + 1.5*r) * 2.6 + r.x * 1.0;",
+      "  float k = v * 1.8 + p.x * 1.6 - p.y * 2.0;",                        // le long des vagues + une diagonale : plusieurs couleurs à l'écran
+      "  float i = floor(k), fr = fract(k);",
+      "  vec3 c = mix(pal(i), pal(i + 1.0), smoothstep(0.38, 0.62, fr));",      // couleurs franches, passage court mais doux
+      "  float lace = smoothstep(0.03, 0.0, abs(fr - 0.5)) * 0.4;",             // fin filet clair à chaque frontière : l'effet de coulée
+      "  c = mix(c, vec3(1.0, 0.96, 0.92), lace);",
+      "  c *= 0.94 + 0.08 * fbm(p * 1.5 + r);",                                // légère matière
+      "  gl_FragColor = vec4(c, 1.0);",
+      "}"
+    ].join("\n"),
+    start() {
+      if (reduced || this.gl) return;
+      const canvas = document.getElementById("fluid");
+      const gl = canvas && canvas.getContext("webgl", { antialias: false, alpha: false, powerPreference: "low-power" });
+      if (!gl) return;
+      const shader = (type, src) => { const sh = gl.createShader(type); gl.shaderSource(sh, src); gl.compileShader(sh); return sh; };
+      const prog = gl.createProgram();
+      gl.attachShader(prog, shader(gl.VERTEX_SHADER, "attribute vec2 a; void main(){ gl_Position = vec4(a, 0.0, 1.0); }"));
+      gl.attachShader(prog, shader(gl.FRAGMENT_SHADER, this.FRAG));
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) return;
+      gl.useProgram(prog);
+      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      const loc = gl.getAttribLocation(prog, "a");
+      gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+      Object.assign(this, { canvas, gl, prog, start0: performance.now() });
+      this.u = { res: gl.getUniformLocation(prog, "res"), t: gl.getUniformLocation(prog, "t"), scroll: gl.getUniformLocation(prog, "scroll") };
+      this.onResize = () => {
+        const k = 0.65;  // résolution réduite : les courbes restent douces, le téléphone respire
+        canvas.width = Math.max(1, Math.round(innerWidth * k)); canvas.height = Math.max(1, Math.round(innerHeight * k));
+        gl.viewport(0, 0, canvas.width, canvas.height);
+      };
+      this.onVisible = () => { if (document.hidden) cancelAnimationFrame(this.raf); else this.raf = requestAnimationFrame((now) => this.draw(now)); };
+      addEventListener("resize", this.onResize);
+      document.addEventListener("visibilitychange", this.onVisible);
+      this.onResize();
+      canvas.hidden = false;
+      document.documentElement.classList.add("fx-fluid");
+      this.raf = requestAnimationFrame((now) => this.draw(now));
+    },
+    draw(now) {
+      this.raf = requestAnimationFrame((n) => this.draw(n));
+      if (now - this.last < 50) return;   // 20 images par seconde suffisent pour un mouvement aussi lent
+      this.last = now;
+      const gl = this.gl;
+      gl.uniform2f(this.u.res, this.canvas.width, this.canvas.height);
+      gl.uniform1f(this.u.t, (now - this.start0) / 1000);
+      gl.uniform1f(this.u.scroll, scrollY / innerHeight);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    },
+    stop() {
+      if (!this.gl) return;
+      cancelAnimationFrame(this.raf);
+      removeEventListener("resize", this.onResize);
+      document.removeEventListener("visibilitychange", this.onVisible);
+      const lose = this.gl.getExtension("WEBGL_lose_context"); if (lose) lose.loseContext();
+      this.canvas.hidden = true;
+      this.gl = null;
+      document.documentElement.classList.remove("fx-fluid");
     }
   };
 
