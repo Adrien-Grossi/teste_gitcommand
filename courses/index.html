@@ -673,7 +673,7 @@ input, select, textarea {
   function openLabeler(ids) {
     if (!ids.length) { showToast("Rien à dater : coche d'abord ce que tu as acheté ou déjà à la maison.", null); return; }
     lb.queue = ids; lb.pos = 0; lb.saved = 0; lb.misses = 0;
-    lb.voice = !!SR; // mains libres : le micro s'ouvre tout seul
+    lb.voice = !DC; // mains libres : le micro s'ouvre tout seul (ou explique pourquoi il ne peut pas)
     if (DC) startCapDictation(); // appelé directement depuis le clic, comme la dictée l'exige
     sheet.hidden = false; document.body.style.overflow = "hidden";
     showItem();
@@ -763,7 +763,7 @@ input, select, textarea {
 
   // Dictée : reconnaissance vocale du navigateur, sans bibliothèque.
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition, rec = null, listening = false;
-  if (SR) $("lbMic").hidden = false; else $("lbKbd").hidden = false;
+  $("lbMic").hidden = false; // toujours visible : s'il ne peut pas marcher, il explique pourquoi
   function setMic(on) {
     if (DC) return; // la dictée claude.ai gère son propre état
     listening = on; $("lbMic").classList.toggle("on", on);
@@ -790,10 +790,36 @@ input, select, textarea {
     if (/\b(stop|termine|arrete|c'est fini)\b/.test(t)) { closeLabeler(); return true; }
     return false;
   }
+  var NO_SR_MSG = "Ce navigateur n'a pas la reconnaissance vocale. Ouvre l'appli par son icône sur l'écran d'accueil, ou ce lien directement dans Chrome (pas depuis l'appli Claude).";
+  var micOk = false;
+  function micFail(code) {
+    lb.voice = false;
+    var m = {
+      "not-allowed": "Chrome refuse le micro à ce site. Touche ⋮ → Paramètres → Paramètres des sites → Micro, autorise adrien-grossi.github.io, puis touche le bouton micro.",
+      "NotAllowedError": "Chrome refuse le micro à ce site. Touche ⋮ → Paramètres → Paramètres des sites → Micro, autorise adrien-grossi.github.io, puis touche le bouton micro.",
+      "service-not-allowed": "La reconnaissance vocale Google est désactivée sur ce téléphone. Vérifie que l'appli Google est installée et activée, puis réessaie.",
+      "audio-capture": "Le micro est occupé par une autre appli, ou introuvable. Ferme-la et touche le bouton micro.",
+      "NotFoundError": "Aucun micro trouvé sur cet appareil.",
+      "network": "La dictée a besoin d'internet. Vérifie ta connexion et touche le bouton micro.",
+      "language-not-supported": "Le français n'est pas disponible pour la dictée sur ce téléphone."
+    }[code] || "Le micro n'a pas marché. Touche le bouton micro pour réessayer.";
+    lb.msg = m + " (code : " + code + ")";
+    drawDate();
+  }
   function listen() {
     stopListening();
-    if (!SR || sheet.hidden) return;
-    var r; try { r = new SR(); } catch (e) { return; }
+    if (sheet.hidden) return;
+    if (!SR) { lb.voice = false; lb.msg = NO_SR_MSG; drawDate(); return; }
+    // 1re fois : on demande clairement l'accès au micro, pour que Chrome affiche sa question.
+    if (!micOk && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      setMic(true);
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) {
+        s.getTracks().forEach(function (t) { t.stop(); });
+        micOk = true; if (!sheet.hidden && lb.voice) listen(); else setMic(false);
+      }, function (err) { setMic(false); micFail(err && err.name || "inconnu"); });
+      return;
+    }
+    var r; try { r = new SR(); } catch (e) { micFail("création impossible"); return; }
     rec = r; lb.relisten = false; r.lang = "fr-FR"; r.interimResults = false; r.maxAlternatives = 5;
     r.onresult = function (ev) {
       if (rec !== r) return;
@@ -804,15 +830,13 @@ input, select, textarea {
     };
     r.onerror = function (ev) {
       if (rec !== r) return;
-      if (ev.error === "not-allowed" || ev.error === "service-not-allowed" || ev.error === "audio-capture") {
-        lb.voice = false; lb.msg = "Le micro est bloqué ici. Ouvre l'appli installée sur l'écran d'accueil, ou tape la date.";
-        $("lbMic").hidden = true; $("lbKbd").hidden = false; SR = null;
-      } else if (ev.error === "no-speech") {
+      if (ev.error === "aborted") return;
+      if (ev.error === "no-speech") {
         lb.misses = (lb.misses || 0) + 1;
         if (lb.misses < 3) lb.relisten = true;
         else { lb.voice = false; lb.misses = 0; lb.msg = "Micro en pause. Touche le bouton micro pour reprendre."; }
-      } else if (ev.error !== "aborted") { lb.relisten = true; }
-      drawDate();
+        drawDate();
+      } else micFail(ev.error);
     };
     r.onend = function () {
       if (rec !== r) return;
@@ -843,7 +867,7 @@ input, select, textarea {
     if (window.claude && window.claude.use) window.claude.use("dictation").then(function (d) {
       if (!d) return;
       DC = d; SR = null;
-      $("lbMic").hidden = false; $("lbKbd").hidden = true;
+      $("lbMic").hidden = false;
       d.onState(function (s) {
         dcOn = s.state === "listening" || s.state === "starting";
         listening = dcOn; $("lbMic").classList.toggle("on", dcOn);
