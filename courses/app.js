@@ -62,7 +62,7 @@
   const GLASS_DEFAULTS = {
     colors: ["#293dd9", "#8040f2", "#ff5c8c", "#ff8f4d", "#1ac7cc"],
     complexity: 3, size: 1, fusion: 0.24, lace: 0.4, speed: 1,
-    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, light: 1, round: 1, thick: 1.6, reflect: 0.8, counter: 1, cwidth: 1, crough: 0.2,
+    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, smoke: 0, smokeColor: "#1b1a2e", impurity: 0, tshadow: 1, light: 1, round: 1, thick: 1.6, reflect: 0.8, counter: 1, cwidth: 1, crough: 0.2,
     // Sources lumineuses posées dans le fond (1 à 3) : x, y sur l'écran (0 à 1), taille et
     // profondeur derrière le verre (0 à 1), intensité (0 à 2), couleur.
     lights: [
@@ -112,6 +112,7 @@
     if (!isObj(g)) return out;
     const colors = Array.isArray(g.colors) ? g.colors.filter((c) => /^#[0-9a-f]{6}$/i.test(c)).slice(0, 8) : [];
     if (colors.length >= 2) out.colors = colors;
+    if (typeof g.smokeColor === "string" && /^#[0-9a-f]{6}$/i.test(g.smokeColor)) out.smokeColor = g.smokeColor;
     for (const c of GLASS_SLIDERS) if (typeof g[c.key] === "number") out[c.key] = Math.min(c.max, Math.max(c.min, g[c.key]));
     if (Array.isArray(g.lights)) {
       const clamp = (v, d) => (typeof v === "number" ? Math.min(LIGHT_LIMITS[d][1], Math.max(LIGHT_LIMITS[d][0], v)) : null);
@@ -865,12 +866,15 @@
     { group: "labGlass", key: "bezel", label: "Bombé des bords", min: 0, max: 1.5, step: 0.05, show: (v) => (v >= 1 ? "dôme parfait" : v < 0.15 ? "presque plat" : pct(v)) },
     { group: "labGlass", key: "thick", label: "Épaisseur du verre", min: 0.4, max: 5, step: 0.1, show: (v) => (v > 3 ? "très épais (" + v.toFixed(1) + ")" : v.toFixed(1)) },
     { group: "labGlass", key: "diffraction", label: "Diffraction (couleurs séparées)", min: 0, max: 2, step: 0.02, show: (v) => (v ? pct(v) : "aucune") },
-    { group: "labGlass", key: "frost", label: "Verre fumé", min: 0, max: 2, step: 0.02, show: (v) => (v ? pct(v) : "clair") },
+    { group: "labGlass", key: "impurity", label: "Impuretés du verre", min: 0, max: 2, step: 0.02, show: (v) => (v ? (v < 0.5 ? "légères" : v < 1.2 ? "marquées" : "très marquées") + " (" + pct(v) + ")" : "verre pur") },
+    { group: "labGlass", key: "frost", label: "Flou (verre dépoli)", min: 0, max: 2, step: 0.02, show: (v) => (v ? pct(v) : "clair") },
+    { group: "labGlass", key: "smoke", label: "Verre fumé (teinte)", min: 0, max: 1.5, step: 0.02, show: (v) => (v ? pct(v) : "clair") },
     { group: "labGlass", key: "reflect", label: "Reflets du décor sur le bord", min: 0, max: 2, step: 0.05, show: (v) => (v ? pct(v) : "aucun") },
     { group: "labGlass", key: "counter", label: "Contre-reflets et ombre nette", min: 0, max: 2, step: 0.05, show: (v) => (v ? pct(v) : "aucun") },
     { group: "labGlass", key: "cwidth", label: "Épaisseur du contre-reflet", min: 0.4, max: 5, step: 0.05, show: (v) => (v < 0.7 ? "très fin" : v > 3 ? "épais (" + v.toFixed(1) + ")" : v.toFixed(2)) },
     { group: "labGlass", key: "crough", label: "Rugosité du contre-reflet", min: 0, max: 1, step: 0.02, show: (v) => (v < 0.1 ? "net, poli" : v > 0.8 ? "très rugueux" : pct(v)) },
     { group: "labGlass", key: "light", label: "Éclats des lumières sur le bord", min: 0, max: 4, step: 0.05, show: (v) => (v ? pct(v) : "éteints") },
+    { group: "labGlass", key: "tshadow", label: "Ombre des textes", min: 0, max: 2.5, step: 0.05, show: (v) => (v ? pct(v) : "aucune") },
     { group: "labGlass", key: "round", label: "Arrondi des cartes", min: 0, max: 1, step: 0.02, show: (v) => (v > 0.97 ? "galet" : v < 0.03 ? "coins vifs" : pct(v)) }
   ];
   const LIGHT_LIMITS = { x: [0, 1], y: [0, 1], power: [0, 4], size: [0.05, 2], depth: [0.05, 2] };
@@ -892,6 +896,7 @@
       '<button type="button" data-rm="' + i + '" aria-label="Retirer la couleur ' + (i + 1) + '"' + (n <= 2 ? " disabled" : "") + ">×</button>" +
       '<span class="grip" role="img" aria-label="Glisser pour changer l\'ordre" title="Glisser pour changer l\'ordre"></span></span>').join("") +
       (n < 8 ? '<button class="pill" type="button" data-add>+ Couleur</button>' : "");
+    $("labSmoke").value = g.smokeColor;
     for (const c of GLASS_SLIDERS) { $("lab-" + c.key).value = g[c.key]; $("labOut-" + c.key).textContent = c.show(g[c.key]); }
     drawLights();
   }
@@ -986,7 +991,8 @@
       const c = GLASS_SLIDERS.find((x) => x.key === t.dataset.key);
       state.glass[c.key] = +t.value;
       $("labOut-" + c.key).textContent = c.show(+t.value);
-    } else if (t.dataset.ci) state.glass.colors[+t.dataset.ci] = t.value;
+    } else if (t.id === "labSmoke") state.glass.smokeColor = t.value;
+    else if (t.dataset.ci) state.glass.colors[+t.dataset.ci] = t.value;
     else if (t.dataset.lc) {
       const i = +t.dataset.lc;
       state.glass.lights[i].color = t.value;

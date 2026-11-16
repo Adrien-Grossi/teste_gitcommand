@@ -43,7 +43,7 @@
   const glass = {
     colors: ["#293dd9", "#8040f2", "#ff5c8c", "#ff8f4d", "#1ac7cc"],
     complexity: 3, size: 1, fusion: 0.24, lace: 0.4, speed: 1,
-    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, light: 1, round: 1, thick: 1.6, reflect: 0.8, counter: 1, cwidth: 1, crough: 0.2,
+    zoom: 1.12, bezel: 1, diffraction: 0.5, frost: 0, smoke: 0, smokeColor: "#1b1a2e", impurity: 0, tshadow: 1, light: 1, round: 1, thick: 1.6, reflect: 0.8, counter: 1, cwidth: 1, crough: 0.2,
     // Sources lumineuses posées dans le fond (1 à 3) : x, y sur l'écran (0 à 1), taille et
     // profondeur derrière le verre (0 à 1), intensité (0 à 2), couleur.
     lights: [
@@ -53,7 +53,9 @@
   };
   function setGlass(p) {
     Object.assign(glass, p);
-    document.documentElement.style.setProperty("--frost-tint", "rgba(255,255,255," + (glass.frost * 0.16).toFixed(3) + ")");
+    const sc = parseInt(glass.smokeColor.slice(1), 16);   // fumée : voile de la couleur choisie (aussi sur les barres)
+    document.documentElement.style.setProperty("--frost-tint", "rgba(" + (sc >> 16 & 255) + "," + (sc >> 8 & 255) + "," + (sc & 255) + "," + Math.min(glass.smoke * 0.4, 0.7).toFixed(3) + ")");
+    document.documentElement.style.setProperty("--ts", String(glass.tshadow));   // intensité de l'ombre des textes
     liquid.rebuild();
   }
 
@@ -368,7 +370,8 @@
       "uniform vec2 res; uniform float t, scroll, oct, warp, size, fusion, lace, ncol, px;",
       "uniform vec3 cols[8];",
       "uniform vec4 cards[" + MAX_CARDS + "]; uniform float crad[" + MAX_CARDS + "]; uniform float ncard;",
-      "uniform float gZoom, gBezel, gDisp, gFrost, gLight, gRound, gThick, gReflect, gCounter, gCw, gRough;",
+      "uniform float gZoom, gBezel, gDisp, gFrost, gLight, gRound, gThick, gReflect, gCounter, gCw, gRough, gSmoke, gImp;",
+      "uniform vec3 smokeCol;",
       "uniform vec4 lPos[3], lCol[3]; uniform float nlight;",   // sources du fond : (x, y, profondeur, rayon) en pixels CSS ; (couleur, intensité)
       "float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }",
       "float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);",
@@ -406,6 +409,8 @@
       // p = 2 : cercle (dôme parfait). p plus grand : sommet plus plat et bord plus raide, mais toujours
       // une courbe continue, sans jonction entre un plateau et un bord (une jonction fait un pli visible).
       "float bevel(float d, float z, float p){ float u = 1.0 - clamp(d / z, 0.0, 1.0); return z * pow(max(1.0 - pow(u, p), 0.0), 1.0 / p); }",
+      // Flou « dépoli » : 9 prises réparties en spirale (pas de copies fantômes, même très flou).
+      "vec3 blurAt(vec2 sp, float r){ vec3 s = bgAt(sp); for (int i = 0; i < 8; i++){ float k = float(i); float a = k * 2.39996, d = sqrt((k + 0.5) / 8.0) * r; s += bgAt(sp + d * vec2(cos(a), sin(a))); } return s / 9.0; }",
       "void main(){",
       "  vec2 pc = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y) / px;",
       "  vec3 base = bgAt(pc);",
@@ -437,6 +442,11 @@
       "  float hL = bevel(-rr(lp - vec2(e, 0.0), hs, rad), zR, pp), hR = bevel(-rr(lp + vec2(e, 0.0), hs, rad), zR, pp);",
       "  float hU = bevel(-rr(lp - vec2(0.0, e), hs, rad), zR, pp), hD = bevel(-rr(lp + vec2(0.0, e), hs, rad), zR, pp);",
       "  vec2 g = vec2(hR - hL, hD - hU) / (2.0 * e);",
+      // Impuretés : le verre n'est pas uniforme. Un champ de bruit lié à la carte (il la suit quand on
+      // défile) dévie la surface par endroits, trouble le verre par nuages et dédouble l'image.
+      "  vec2 q = lp + b.zw * 0.37;",
+      "  float cloud = smoothstep(0.38, 0.72, n(q * 0.035 + 9.0));",
+      "  g += ((vec2(n(q * 0.07 + 3.1), n(q * 0.07 + 17.7)) - 0.5) * 1.1 + (vec2(n(q * 0.21 + 5.3), n(q * 0.21 + 11.9)) - 0.5) * 0.7) * gImp * 0.6;",
       "  vec3 N = normalize(vec3(-g, 1.0));",
       // Réfraction rayon par rayon : le rayon venu de l'œil entre dans le verre (loi de Snell),
       // traverse son épaisseur, et touche le fond plus loin. Chaque couleur a son indice : dispersion.
@@ -452,10 +462,22 @@
       "  vec2 oB = Tb.xy / max(-Tb.z, 0.25) * thick * gThick + zoom;",
       "  vec3 col = vec3(bgAt(pc + oR).r, bgAt(pc + oG).g, bgAt(pc + oB).b);",
       // verre fumé : on mélange avec une moyenne autour (flou)
-      "  if (gFrost > 0.01){",
-      "    vec2 sp = pc + oG; float rb = 4.0 + gFrost * 12.0;",   // le flou continue d'augmenter au-delà de 100 %
-      "    vec3 bl = (bgAt(sp + vec2(rb, 0.0)) + bgAt(sp - vec2(rb, 0.0)) + bgAt(sp + vec2(0.0, rb)) + bgAt(sp - vec2(0.0, rb))) * 0.25;",
-      "    col = mix(col, bl + 0.05, min(gFrost, 1.0));",
+      "  float rbl = gFrost * 12.0 + gImp * cloud * 9.0;",
+      "  if (rbl > 0.3){",
+      "    vec3 bl = blurAt(pc + oG, rbl);",
+      "    col = mix(col, bl + 0.03 * gFrost, min(gFrost + gImp * cloud * 0.9, 1.0));",
+      "  }",
+      // Dédoublement : par plaques, une seconde image décalée se superpose à la première.
+      "  if (gImp > 0.01){",
+      "    float dbl = smoothstep(0.45, 0.7, n(q * 0.05 + 31.0)) * min(gImp, 1.0) * 0.5;",
+      "    vec2 dv = (vec2(n(q * 0.08 + 2.0), n(q * 0.08 + 8.0)) - 0.5) * 28.0 * gImp;",
+      "    vec3 c2 = vec3(bgAt(pc + oR + dv).r, bgAt(pc + oG + dv).g, bgAt(pc + oB + dv).b);",
+      "    col = mix(col, c2, dbl) + cloud * gImp * 0.025;",
+      "  }",
+      // Verre fumé : le verre absorbe et prend la couleur choisie ; plus épais au bord, plus sombre.
+      "  if (gSmoke > 0.01){",
+      "    float sk = min(gSmoke * (0.75 + 0.5 * bevel(inside, zR, pp) / zR), 1.0);",
+      "    col = mix(col, smokeCol * (0.3 + 0.9 * dot(col, vec3(0.299, 0.587, 0.114))), sk * 0.7);",
       "  }",
       // Le verre absorbe un peu là où il est épais ; la lumière du fond qui voyage dans le verre
       // ressort tout au bord, en un liseré très fin de sa propre couleur.
@@ -536,7 +558,7 @@
       gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
       this.u = {};
       for (const name of ["res", "t", "scroll", "oct", "warp", "size", "fusion", "lace", "ncol", "px", "cols", "cards", "crad", "ncard",
-        "gZoom", "gBezel", "gDisp", "gFrost", "gLight", "gRound", "gThick", "gReflect", "gCounter", "gCw", "gRough", "lPos", "lCol", "nlight"]) this.u[name] = gl.getUniformLocation(prog, name);
+        "gZoom", "gBezel", "gDisp", "gFrost", "gSmoke", "gImp", "smokeCol", "gLight", "gRound", "gThick", "gReflect", "gCounter", "gCw", "gRough", "lPos", "lCol", "nlight"]) this.u[name] = gl.getUniformLocation(prog, name);
       Object.assign(this, { canvas, gl });
       this.onResize = () => {
         const k = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);  // pleine résolution (2× max) : les bords arrondis restent nets
@@ -592,7 +614,8 @@
       gl.uniform3fv(u.cols, rgb);
       gl.uniform4fv(u.cards, boxes); gl.uniform1fv(u.crad, radii); gl.uniform1f(u.ncard, n);
       gl.uniform1f(u.gZoom, glass.zoom); gl.uniform1f(u.gBezel, glass.bezel); gl.uniform1f(u.gDisp, glass.diffraction);
-      gl.uniform1f(u.gFrost, glass.frost); gl.uniform1f(u.gLight, glass.light); gl.uniform1f(u.gRound, glass.round);
+      gl.uniform1f(u.gFrost, glass.frost); gl.uniform1f(u.gSmoke, glass.smoke); gl.uniform1f(u.gImp, glass.impurity);
+      { const v = parseInt(glass.smokeColor.slice(1), 16); gl.uniform3f(u.smokeCol, (v >> 16 & 255) / 255, (v >> 8 & 255) / 255, (v & 255) / 255); } gl.uniform1f(u.gLight, glass.light); gl.uniform1f(u.gRound, glass.round);
       gl.uniform1f(u.gThick, glass.thick); gl.uniform1f(u.gReflect, glass.reflect); gl.uniform1f(u.gCounter, glass.counter);
       gl.uniform1f(u.gCw, glass.cwidth); gl.uniform1f(u.gRough, glass.crough);
       // Sources du fond : elles dérivent lentement avec les vagues (même vitesse que le fond).
