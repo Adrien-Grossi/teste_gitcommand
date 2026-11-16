@@ -199,16 +199,15 @@
     //    puis la courbure s'adoucit vers l'intérieur (pente du profil), sans arête ;
     //  - le grossissement (zoom > 1) : tout l'intérieur montre une zone plus petite, donc agrandie.
     // range = décalage maximal en pixels, qui devient l'échelle du filtre.
-    // Renvoie aussi le masque de lumière, en trois couches (une par couleur) : la lumière du fond se concentre
-    // en une bande le long de la courbe du bombé (une caustique), et chaque couleur s'y place à une profondeur
-    // un peu différente (le rouge plus près du bord, le bleu plus à l'intérieur) : c'est la dispersion.
+    // Renvoie aussi le masque de lumière : où la carte s'éclaire de la couleur du fond
+    // (le long du bord, surtout en haut). Aucune couleur n'y est séparée : la dispersion vient
+    // uniquement de la déviation (voir filter), donc nulle au centre et forte près des bords.
     maps(w, h, r, bezel, zoom, range) {
       const c = document.createElement("canvas"); c.width = w; c.height = h;
       const g = c.getContext("2d"), img = g.createImageData(w, h), px = img.data;
       const lc = document.createElement("canvas"); lc.width = w; lc.height = h;
       const lg = lc.getContext("2d"), limg = lg.createImageData(w, h), lpx = limg.data;
-      const peak = bezel * 0.32, width = bezel * 0.16, spread = glass.diffraction * 0.75;   // bandes fines, dans la courbe du bord
-      const band = (d, p) => Math.exp(-(((d - p) / width) ** 2));
+      const rim = bezel * 1.4;
       const shrink = 1 - 1 / zoom;
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
@@ -229,11 +228,8 @@
           px[i + 2] = 128; px[i + 3] = 255;
           // plus de lumière sur le haut (côté éclairé), moins sur le bas, peu sur les côtés
           const facing = (oy < 0 ? 1 : 0.6) * (0.45 + 0.55 * Math.abs(ny)) * glass.light;
-          const d = Math.max(depth, 0);
-          lpx[i] = Math.min(1, band(d, peak * (1 - spread)) * facing) * 255;       // rouge
-          lpx[i + 1] = Math.min(1, band(d, peak) * facing) * 255;                  // vert
-          lpx[i + 2] = Math.min(1, band(d, peak * (1 + spread)) * facing) * 255;   // bleu
-          lpx[i + 3] = 255;
+          const glow = depth < rim ? Math.min(1, Math.pow(1 - Math.max(depth, 0) / rim, 1.4) * facing) : 0;
+          lpx[i] = lpx[i + 1] = lpx[i + 2] = 255; lpx[i + 3] = glow * 255;
         }
       }
       g.putImageData(img, 0, 0); lg.putImageData(limg, 0, 0);
@@ -270,15 +266,16 @@
       // éclaircit la couleur du fond sans la blanchir (pas de décalage vers le blanc)
       const lift = '<feFuncR type="gamma" amplitude="1.9" exponent="0.8"/><feFuncG type="gamma" amplitude="1.9" exponent="0.8"/><feFuncB type="gamma" amplitude="1.9" exponent="0.8"/>';
       f.innerHTML = img(m.map, "map") +
-        // diffraction : le vert et le bleu sont moins déviés que le rouge (jusqu'à moitié moins au maximum)
-        channel(0, scale) + channel(1, scale * (1 - 0.25 * glass.diffraction)) + channel(2, scale * (1 - 0.5 * glass.diffraction)) +
+        // Dispersion : chaque couleur est déviée avec une force différente (le bleu jusqu'à 70 % de moins que le rouge).
+        // L'écart est proportionnel à la déviation : nul au centre, de plus en plus fort vers les bords.
+        channel(0, scale) + channel(1, scale * (1 - 0.35 * glass.diffraction)) + channel(2, scale * (1 - 0.7 * glass.diffraction)) +
         '<feBlend in="c0" in2="c1" mode="screen" result="rg"/><feBlend in="rg" in2="c2" mode="screen" result="rgb"/>' +
         '<feGaussianBlur in="rgb" stdDeviation="0.5" result="clear"/>' +
         img(m.light, "lightmask") +
         '<feGaussianBlur in="SourceGraphic" stdDeviation="7" result="soft"/>' +
         '<feColorMatrix in="soft" type="saturate" values="2.6" result="sat"/>' +
         '<feComponentTransfer in="sat" result="bright">' + lift + '</feComponentTransfer>' +
-        '<feBlend in="bright" in2="lightmask" mode="multiply" result="glow"/>' +   // couleur du fond × bande de chaque couleur
+        '<feComposite in="bright" in2="lightmask" operator="in" result="glow"/>' +
         '<feBlend in="glow" in2="clear" mode="screen"/>';
       this.defs.appendChild(f);
       this.filters.set(id, f);
