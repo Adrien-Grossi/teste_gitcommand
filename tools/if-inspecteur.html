@@ -1,0 +1,311 @@
+<title>Inspecteur de dossier IF</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout : une colonne étroite, trois étapes empilées, rapport en bas */
+:root {
+  --bg: #f3f4f7; --surface: #ffffff; --fg: #1b1e27; --muted: #5d6475;
+  --line: #d9dce5; --accent: #3b5bdb; --accent-fg: #ffffff; --ok: #2b8a3e; --warn: #b35c00;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12141a; --surface: #1b1e27; --fg: #e8eaf0; --muted: #9aa1b2;
+  --line: #2e3240; --accent: #7c96ff; --accent-fg: #0d0f15; --ok: #69db7c; --warn: #ffa94d; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12141a; --surface: #1b1e27; --fg: #e8eaf0; --muted: #9aa1b2;
+  --line: #2e3240; --accent: #7c96ff; --accent-fg: #0d0f15; --ok: #69db7c; --warn: #ffa94d; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--font); }
+main { max-width: 640px; margin: 0 auto; padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 18px; }
+h1 { font-size: 1.35rem; margin: 0; text-wrap: balance; }
+h2 { font-size: 1rem; margin: 0; }
+p { margin: 0; }
+.lead { color: var(--muted); }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.step .tag { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+label.btn, button { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 16px;
+  border-radius: 8px; border: 0; background: var(--accent); color: var(--accent-fg); font: 600 1rem var(--font); cursor: pointer; }
+label.btn.alt { background: transparent; color: var(--accent); border: 1.5px solid var(--accent); }
+label.btn:focus-within, button:focus-visible { outline: 3px solid var(--fg); outline-offset: 2px; }
+input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+ol { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 4px; }
+.hint { font-size: .88rem; color: var(--muted); }
+#status { font-weight: 600; }
+#status.ok { color: var(--ok); } #status.warn { color: var(--warn); }
+textarea { width: 100%; box-sizing: border-box; min-height: 300px; font: 12px/1.4 var(--mono); color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; resize: vertical; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+</style>
+
+<main>
+  <header style="display:flex;flex-direction:column;gap:6px">
+    <h1>Inspecteur de dossier Infinite Fusion</h1>
+    <p class="lead">Cette page regarde le contenu du dossier du jeu sur ton téléphone et écrit un rapport à copier pour Claude. Tout se passe dans ton navigateur : aucun fichier n'est envoyé.</p>
+  </header>
+
+  <section class="step">
+    <span class="tag">Étape 1</span>
+    <h2>Trouver le dossier du jeu</h2>
+    <ol class="hint">
+      <li>Ouvre ton gestionnaire de fichiers (« Fichiers », « Mes fichiers »…).</li>
+      <li>Cherche <b>CustomBattlers</b> avec la loupe.</li>
+      <li>Le dossier du jeu est celui qui contient <b>Graphics</b> (le parent du parent de CustomBattlers).</li>
+    </ol>
+  </section>
+
+  <section class="step">
+    <span class="tag">Étape 2</span>
+    <h2>Le donner à la page</h2>
+    <p class="hint">Essaie d'abord le bouton « Choisir le dossier ». Si ton téléphone ne laisse choisir que des fichiers, compresse le dossier du jeu en .zip (appui long dans « Mes fichiers » → Compresser, ou l'app ZArchiver) puis utilise « Choisir un .zip ».</p>
+    <div class="row">
+      <label class="btn">Choisir le dossier<input id="pickDir" type="file" webkitdirectory multiple></label>
+      <label class="btn alt">Choisir un .zip<input id="pickZip" type="file" accept=".zip,application/zip"></label>
+    </div>
+    <p id="status" class="hint" aria-live="polite">En attente d'un dossier ou d'un zip.</p>
+  </section>
+
+  <section class="step">
+    <span class="tag">Étape 3</span>
+    <h2>Copier le rapport et le coller à Claude</h2>
+    <div class="row">
+      <button id="copy" type="button">Copier le rapport</button>
+      <span id="copied" class="hint"></span>
+    </div>
+    <textarea id="out" readonly spellcheck="false">Le rapport apparaîtra ici.</textarea>
+  </section>
+</main>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const status = (msg, cls) => { $('status').textContent = msg; $('status').className = 'hint ' + (cls || ''); };
+const fmt = n => n < 1024 ? n + ' o' : n < 1048576 ? (n/1024).toFixed(1) + ' Ko' : n < 1073741824 ? (n/1048576).toFixed(1) + ' Mo' : (n/1073741824).toFixed(2) + ' Go';
+
+/* ---------- lecture d'un zip (répertoire central seulement, zip64 compris) ---------- */
+async function readSlice(file, start, len) { return new DataView(await file.slice(start, start + len).arrayBuffer()); }
+const u64 = (dv, o) => dv.getUint32(o, true) + dv.getUint32(o + 4, true) * 4294967296;
+async function inflateRaw(u8) {
+  const s = new Blob([u8]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+async function zipEntries(file) {
+  const tailLen = Math.min(file.size, 65557 + 20);
+  const tail = await readSlice(file, file.size - tailLen, tailLen);
+  let p = -1;
+  for (let i = tailLen - 22; i >= 0; i--) if (tail.getUint32(i, true) === 0x06054b50) { p = i; break; }
+  if (p < 0) throw new Error("Ce fichier n'a pas l'air d'être un zip valide.");
+  let count = tail.getUint16(p + 10, true), cdSize = tail.getUint32(p + 12, true), cdOff = tail.getUint32(p + 16, true);
+  if (count === 0xFFFF || cdSize === 0xFFFFFFFF || cdOff === 0xFFFFFFFF) {
+    const lp = p - 20;
+    if (lp >= 0 && tail.getUint32(lp, true) === 0x07064b50) {
+      const z = await readSlice(file, u64(tail, lp + 8), 56);
+      count = u64(z, 32); cdSize = u64(z, 40); cdOff = u64(z, 48);
+    }
+  }
+  const cd = await readSlice(file, cdOff, cdSize);
+  const dec = new TextDecoder('utf-8');
+  const out = [];
+  let o = 0;
+  while (o + 46 <= cd.byteLength && cd.getUint32(o, true) === 0x02014b50) {
+    const method = cd.getUint16(o + 10, true);
+    let csize = cd.getUint32(o + 20, true), usize = cd.getUint32(o + 24, true);
+    const nlen = cd.getUint16(o + 28, true), elen = cd.getUint16(o + 30, true), clen = cd.getUint16(o + 32, true);
+    let loff = cd.getUint32(o + 42, true);
+    const name = dec.decode(new Uint8Array(cd.buffer, cd.byteOffset + o + 46, nlen));
+    let e = o + 46 + nlen; const eEnd = e + elen;
+    while (e + 4 <= eEnd) {
+      const id = cd.getUint16(e, true), sz = cd.getUint16(e + 2, true); let q = e + 4;
+      if (id === 1) {
+        if (usize === 0xFFFFFFFF) { usize = u64(cd, q); q += 8; }
+        if (csize === 0xFFFFFFFF) { csize = u64(cd, q); q += 8; }
+        if (loff === 0xFFFFFFFF) { loff = u64(cd, q); }
+      }
+      e += 4 + sz;
+    }
+    if (!name.endsWith('/')) {
+      out.push({ path: name.replace(/\\/g, '/'), size: usize, read: async (max) => {
+        const lh = await readSlice(file, loff, 30);
+        const start = loff + 30 + lh.getUint16(26, true) + lh.getUint16(28, true);
+        const raw = new Uint8Array(await file.slice(start, start + csize).arrayBuffer());
+        if (method === 0) return max ? raw.slice(0, max) : raw;
+        if (method === 8) { const d = await inflateRaw(raw); return max ? d.slice(0, max) : d; }
+        throw new Error('compression ' + method);
+      }});
+    }
+    o = eEnd + clen;
+  }
+  return out;
+}
+function dirEntries(files) {
+  return Array.from(files, f => ({ path: (f.webkitRelativePath || f.name).replace(/\\/g, '/'), size: f.size,
+    read: async (max) => new Uint8Array(await (max ? f.slice(0, max) : f).arrayBuffer()) }));
+}
+
+/* ---------- analyse ---------- */
+const hex = u8 => Array.from(u8, b => b.toString(16).padStart(2, '0')).join(' ');
+function pngInfo(u8) {
+  if (u8.length < 26 || u8[0] !== 0x89 || u8[1] !== 0x50) return 'pas un PNG';
+  const dv = new DataView(u8.buffer, u8.byteOffset);
+  const ct = { 0: 'gris', 2: 'RVB', 3: 'palette', 4: 'gris+alpha', 6: 'RVBA' }[u8[25]] || ('type ' + u8[25]);
+  return dv.getUint32(16) + '×' + dv.getUint32(20) + ', ' + ct;
+}
+
+async function analyse(entries, sourceLabel) {
+  const L = [];
+  const total = entries.reduce((s, e) => s + e.size, 0);
+  L.push('=== Rapport dossier Infinite Fusion ===');
+  L.push('Source : ' + sourceLabel + ' — ' + entries.length + ' fichiers, ' + fmt(total));
+
+  // racine = préfixe qui contient Graphics/
+  let root = '';
+  let best = Infinity;
+  for (const e of entries) {
+    const i = e.path.search(/(^|\/)Graphics\//i);
+    if (i >= 0) { const pre = e.path.slice(0, e.path[i] === '/' ? i + 1 : i); if (pre.length < best) { best = pre.length; root = pre; } }
+  }
+  L.push('Dossier du jeu détecté : ' + (best === Infinity ? '(aucun dossier « Graphics » trouvé !)' : (root || '(racine)')));
+  const rel = entries.filter(e => e.path.startsWith(root)).map(e => ({ ...e, r: e.path.slice(root.length) }));
+
+  // arbre
+  const dirs = new Map();
+  const getDir = p => { let d = dirs.get(p); if (!d) { d = { files: 0, total: 0, ext: {}, subs: new Set(), samples: [] }; dirs.set(p, d); } return d; };
+  getDir('');
+  for (const e of rel) {
+    const parts = e.r.split('/'); const name = parts.pop();
+    let cur = '';
+    getDir('').total++;
+    for (const part of parts) { const nxt = cur ? cur + '/' + part : part; getDir(cur).subs.add(part); getDir(nxt).total++; cur = nxt; }
+    const d = getDir(cur); d.files++;
+    const ext = (name.match(/\.([^.]+)$/) || [, '(sans)'])[1].toLowerCase(); d.ext[ext] = (d.ext[ext] || 0) + 1;
+    if (d.samples.length < 4) d.samples.push(name);
+  }
+  L.push('', '--- Arborescence ---');
+  let lines = 0; const MAXL = 220;
+  const extStr = x => Object.entries(x).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => v + ' .' + k).join(', ');
+  function walk(path, depth, ind) {
+    if (lines > MAXL) return;
+    const d = dirs.get(path);
+    const nm = path ? path.split('/').pop() + '/' : '(racine)/';
+    let s = ind + nm + '  ' + d.total + ' fichiers';
+    if (d.files && d.files !== d.total) s += ' (dont ' + d.files + ' ici)';
+    if (d.files) s += ' [' + extStr(d.ext) + '] ex : ' + d.samples.slice(0, 3).join(', ');
+    L.push(s); lines++;
+    const subs = [...d.subs].sort((a, b) => (+a - +b) || a.localeCompare(b));
+    const num = subs.filter(x => /^\d+$/.test(x)), other = subs.filter(x => !/^\d+$/.test(x));
+    const maxDepth = /^graphics/i.test(path) ? 4 : 2;
+    if (num.length > 3) {
+      const tot = num.reduce((s, x) => s + dirs.get(path ? path + '/' + x : x).total, 0);
+      const first = dirs.get(path ? path + '/' + num[0] : num[0]);
+      L.push(ind + '  [' + num.length + ' sous-dossiers numérotés ' + num[0] + '…' + num[num.length - 1] + ', ' + tot + ' fichiers ; ex ' + num[0] + '/ : ' + first.samples.slice(0, 3).join(', ') + (first.subs.size ? ' + sous-dossiers ' + [...first.subs].slice(0, 4).join(', ') : '') + ']'); lines++;
+    } else other.unshift(...num);
+    if (depth >= maxDepth) { if (other.length) { L.push(ind + '  (+ ' + other.length + ' sous-dossiers : ' + other.slice(0, 8).join(', ') + (other.length > 8 ? '…' : '') + ')'); lines++; } return; }
+    other.slice(0, 25).forEach(x => walk(path ? path + '/' + x : x, depth + 1, ind + '  '));
+    if (other.length > 25) { L.push(ind + '  … et ' + (other.length - 25) + ' autres dossiers'); lines++; }
+  }
+  walk('', 0, '');
+  if (lines > MAXL) L.push('(arborescence tronquée)');
+
+  // motifs de noms
+  L.push('', '--- Noms des images PNG ---');
+  const zones = new Map();
+  const z = k => { let v = zones.get(k); if (!v) { v = { fus: 0, alt: 0, uniq: new Set(), hMin: 1e9, hMax: 0, bMin: 1e9, bMax: 0, single: 0, other: 0, otherEx: [] }; zones.set(k, v); } return v; };
+  for (const e of rel) {
+    if (!/\.png$/i.test(e.r)) continue;
+    const parts = e.r.split('/'); const name = parts.pop();
+    const key = parts.slice(0, 2).join('/') || '(racine)';
+    const v = z(key);
+    let m;
+    if ((m = name.match(/^(\d+)\.(\d+)([a-z]*)\.png$/i))) {
+      v.fus++; if (m[3]) v.alt++; v.uniq.add(m[1] + '.' + m[2]);
+      const h = +m[1], b = +m[2];
+      v.hMin = Math.min(v.hMin, h); v.hMax = Math.max(v.hMax, h); v.bMin = Math.min(v.bMin, b); v.bMax = Math.max(v.bMax, b);
+    } else if (/^\d+[a-z_]*\.png$/i.test(name)) v.single++;
+    else { v.other++; if (v.otherEx.length < 5) v.otherEx.push(name); }
+  }
+  const zl = [...zones.entries()].sort((a, b) => (b[1].fus + b[1].single + b[1].other) - (a[1].fus + a[1].single + a[1].other)).slice(0, 15);
+  for (const [k, v] of zl) {
+    let s = k + ' : ';
+    const bits = [];
+    if (v.fus) bits.push(v.fus + ' « tête.corps.png » (' + v.uniq.size + ' fusions distinctes, ' + v.alt + ' variantes à lettre ; têtes ' + v.hMin + '–' + v.hMax + ', corps ' + v.bMin + '–' + v.bMax + ')');
+    if (v.single) bits.push(v.single + ' « numéro.png »');
+    if (v.other) bits.push(v.other + ' autres (ex : ' + v.otherEx.join(', ') + ')');
+    L.push(s + bits.join(' ; '));
+  }
+
+  // échantillons d'images
+  L.push('', '--- Échantillons d\'images (dimensions) ---');
+  const pick = re => rel.filter(e => re.test(e.r));
+  const sampleSets = [
+    pick(/customBattlers\/.*\.png$/i), pick(/(^|\/)Battlers\/.*\.png$/i), pick(/spritesheet.*\.png$/i)
+  ];
+  for (const set of sampleSets) {
+    const idx = [0, Math.floor(set.length / 2), set.length - 1].filter((v, i, a) => set.length && a.indexOf(v) === i);
+    for (const i of idx) {
+      try { L.push(set[i].r + ' (' + fmt(set[i].size) + ') → ' + pngInfo(await set[i].read(64))); }
+      catch (err) { L.push(set[i].r + ' → illisible (' + err.message + ')'); }
+    }
+  }
+
+  // fichiers de données
+  L.push('', '--- Dossiers PBS et Data ---');
+  const dataFiles = rel.filter(e => /^(PBS|Data)\//i.test(e.r) && e.r.split('/').length <= 3);
+  if (!dataFiles.length) L.push('Aucun dossier PBS ni Data à la racine du jeu.');
+  dataFiles.slice(0, 120).forEach(e => L.push(e.r + '  ' + fmt(e.size)));
+  if (dataFiles.length > 120) L.push('… et ' + (dataFiles.length - 120) + ' autres');
+
+  // fichiers susceptibles de contenir des noms
+  const nameish = rel.filter(e => !/^(Graphics|Audio)\//i.test(e.r) && /(pokemon|species|names?|messages|dex|fran|_fr|\bfr\b|version|intl)/i.test(e.r.split('/').pop()))
+                     .filter(e => !dataFiles.includes(e)).slice(0, 40);
+  if (nameish.length) { L.push('', '--- Autres fichiers qui pourraient contenir des noms ---'); nameish.forEach(e => L.push(e.r + '  ' + fmt(e.size))); }
+
+  // contenu : début des fichiers texte clés, en-tête des .dat
+  L.push('', '--- Début des fichiers clés ---');
+  const textKeys = rel.filter(e => /(^|\/)(pokemon[^/]*\.txt|species[^/]*\.(txt|json|csv)|[^/]*version[^/]*|[^/]*names?[^/]*\.(txt|json|csv))$/i.test(e.r) && !/^(Graphics|Audio)\//i.test(e.r) && e.size < 20e6).slice(0, 4);
+  for (const e of textKeys) {
+    try {
+      const u8 = await e.read(4000);
+      const txt = new TextDecoder('utf-8').decode(u8).split(/\r?\n/).slice(0, 30).join('\n');
+      L.push('>> ' + e.r + ' :', txt, '<<');
+    } catch (err) { L.push('>> ' + e.r + ' illisible : ' + err.message); }
+  }
+  const datKeys = rel.filter(e => /\.(dat|rxdata)$/i.test(e.r) && /(species|pokemon|messages|names|intl)/i.test(e.r)).slice(0, 6);
+  for (const e of datKeys) {
+    try { const u8 = await e.read(48); L.push(e.r + ' (' + fmt(e.size) + ') premiers octets : ' + hex(u8)); }
+    catch (err) { L.push(e.r + ' illisible : ' + err.message); }
+  }
+  if (!textKeys.length && !datKeys.length) L.push('Aucun fichier de noms reconnu.');
+  L.push('', '=== Fin du rapport ===');
+  return L.join('\n');
+}
+
+async function run(entries, label) {
+  if (!entries.length) { status("Aucun fichier reçu. Ton téléphone n'a peut-être pas transmis le dossier : essaie avec un zip.", 'warn'); return; }
+  status('Analyse de ' + entries.length + ' fichiers…');
+  try {
+    const rep = await analyse(entries, label);
+    $('out').value = rep;
+    status('Rapport prêt (' + rep.length + ' caractères). Copie-le et colle-le à Claude.', 'ok');
+  } catch (err) { status('Erreur : ' + err.message, 'warn'); }
+}
+
+$('pickDir').addEventListener('change', e => {
+  const files = e.target.files;
+  const hasPaths = files.length && files[0].webkitRelativePath;
+  run(dirEntries(files), hasPaths ? 'dossier' : 'fichiers choisis un par un (pas de chemins)');
+});
+$('pickZip').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  status('Lecture du zip ' + f.name + ' (' + fmt(f.size) + ')…');
+  try { run(await zipEntries(f), 'zip ' + f.name + ' (' + fmt(f.size) + ')'); }
+  catch (err) { status('Erreur : ' + err.message, 'warn'); }
+});
+$('copy').addEventListener('click', () => {
+  const t = $('out');
+  const done = ok => { $('copied').textContent = ok ? 'Copié.' : 'Sélectionne le texte et copie-le à la main.'; };
+  try {
+    navigator.clipboard.writeText(t.value).then(() => done(true), () => { t.focus(); t.select(); done(false); });
+  } catch (_) { t.focus(); t.select(); done(false); }
+});
+})();
+</script>
