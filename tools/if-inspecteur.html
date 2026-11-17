@@ -35,6 +35,8 @@ ol { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap:
 #status.ok { color: var(--ok); } #status.warn { color: var(--warn); }
 textarea { width: 100%; box-sizing: border-box; min-height: 300px; font: 12px/1.4 var(--mono); color: var(--fg);
   background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; resize: vertical; }
+button.alt2 { background: transparent; color: var(--muted); border: 1.5px solid var(--line); }
+#log { margin: 6px 0 0; font: 11.5px/1.4 var(--mono); color: var(--muted); white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow: auto; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 </style>
 
@@ -57,12 +59,15 @@ textarea { width: 100%; box-sizing: border-box; min-height: 300px; font: 12px/1.
   <section class="step">
     <span class="tag">Étape 2</span>
     <h2>Le donner à la page</h2>
-    <p class="hint">Essaie d'abord le bouton « Choisir le dossier ». Si ton téléphone ne laisse choisir que des fichiers, compresse le dossier du jeu en .zip (appui long dans « Mes fichiers » → Compresser, ou l'app ZArchiver) puis utilise « Choisir un .zip ».</p>
+    <p class="hint">Après avoir choisi un dossier, Chrome peut demander « Importer N fichiers sur ce site ? » : réponds <b>Importer</b>. Avec beaucoup de fichiers, Chrome peut mettre <b>plusieurs minutes</b> avant de rendre la main : laisse l'écran allumé.</p>
+    <p class="hint">Si le dossier entier ne passe pas, ajoute des petits dossiers <b>un par un</b> (le bouton peut servir plusieurs fois, tout s'additionne) : <b>PBS</b>, puis <b>Data</b>, puis <b>Graphics/Battlers</b>, puis <b>Graphics/CustomBattlers</b>. Si un seul petit morceau passe, le rapport sera déjà utile.</p>
     <div class="row">
-      <label class="btn">Choisir le dossier<input id="pickDir" type="file" webkitdirectory multiple></label>
-      <label class="btn alt">Choisir un .zip<input id="pickZip" type="file" accept=".zip,application/zip"></label>
+      <label class="btn">Ajouter un dossier<input id="pickDir" type="file" webkitdirectory multiple></label>
+      <label class="btn alt">Ajouter un .zip<input id="pickZip" type="file" accept=".zip,application/zip"></label>
+      <button id="reset" type="button" class="alt2">Tout effacer</button>
     </div>
     <p id="status" class="hint" aria-live="polite">En attente d'un dossier ou d'un zip.</p>
+    <details open><summary class="hint">Journal (ce que la page a vu)</summary><pre id="log">La page n'a pas encore démarré. Si ce message reste affiché, le JavaScript ne tourne pas : ouvre la page directement dans Chrome.</pre></details>
   </section>
 
   <section class="step">
@@ -79,7 +84,14 @@ textarea { width: 100%; box-sizing: border-box; min-height: 300px; font: 12px/1.
 <script>
 (() => {
 const $ = id => document.getElementById(id);
-const status = (msg, cls) => { $('status').textContent = msg; $('status').className = 'hint ' + (cls || ''); };
+const logEl = $('log'); logEl.textContent = '';
+const log = msg => { logEl.textContent += new Date().toLocaleTimeString() + '  ' + msg + '\n'; logEl.scrollTop = 1e9; };
+window.addEventListener('error', e => log('ERREUR : ' + e.message));
+window.addEventListener('unhandledrejection', e => log('ERREUR : ' + (e.reason && e.reason.message || e.reason)));
+log('Page prête. Chrome ' + ((navigator.userAgent.match(/Chrome\/(\d+)/) || [, '?'])[1]) + ', choix de dossier ' + ('webkitdirectory' in document.createElement('input') ? 'annoncé' : 'non pris en charge') + ', décompression zip ' + (typeof DecompressionStream === 'function' ? 'OK' : 'absente') + '.');
+let all = [];
+const sources = [];
+const status = (msg, cls) => { log(msg); $('status').textContent = msg; $('status').className = 'hint ' + (cls || ''); };
 const fmt = n => n < 1024 ? n + ' o' : n < 1048576 ? (n/1024).toFixed(1) + ' Ko' : n < 1073741824 ? (n/1048576).toFixed(1) + ' Mo' : (n/1073741824).toFixed(2) + ' Go';
 
 /* ---------- lecture d'un zip (répertoire central seulement, zip64 compris) ---------- */
@@ -165,7 +177,7 @@ async function analyse(entries, sourceLabel) {
     if (i >= 0) { const pre = e.path.slice(0, e.path[i] === '/' ? i + 1 : i); if (pre.length < best) { best = pre.length; root = pre; } }
   }
   L.push('Dossier du jeu détecté : ' + (best === Infinity ? '(aucun dossier « Graphics » trouvé !)' : (root || '(racine)')));
-  const rel = entries.filter(e => e.path.startsWith(root)).map(e => ({ ...e, r: e.path.slice(root.length) }));
+  const rel = entries.map(e => ({ ...e, r: e.path.startsWith(root) ? e.path.slice(root.length) : e.path }));
 
   // arbre
   const dirs = new Map();
@@ -193,7 +205,7 @@ async function analyse(entries, sourceLabel) {
     L.push(s); lines++;
     const subs = [...d.subs].sort((a, b) => (+a - +b) || a.localeCompare(b));
     const num = subs.filter(x => /^\d+$/.test(x)), other = subs.filter(x => !/^\d+$/.test(x));
-    const maxDepth = /^graphics/i.test(path) ? 4 : 2;
+    const maxDepth = /^(graphics|custombattlers|battlers)/i.test(path) ? 4 : 2;
     if (num.length > 3) {
       const tot = num.reduce((s, x) => s + dirs.get(path ? path + '/' + x : x).total, 0);
       const first = dirs.get(path ? path + '/' + num[0] : num[0]);
@@ -280,28 +292,45 @@ async function analyse(entries, sourceLabel) {
 }
 
 async function run(entries, label) {
-  if (!entries.length) { status("Aucun fichier reçu. Ton téléphone n'a peut-être pas transmis le dossier : essaie avec un zip.", 'warn'); return; }
-  status('Analyse de ' + entries.length + ' fichiers…');
+  if (!entries.length) { status("Aucun fichier reçu pour cette sélection. Essaie un dossier plus petit (par ex. PBS) ou un zip.", 'warn'); return; }
+  const seen = new Set(all.map(e => e.path));
+  const fresh = entries.filter(e => !seen.has(e.path));
+  all = all.concat(fresh); sources.push(label + ' : ' + entries.length + ' fichiers');
+  status('Reçu ' + entries.length + ' fichiers (' + all.length + ' au total). Analyse…');
+  await new Promise(r => setTimeout(r, 30));
   try {
-    const rep = await analyse(entries, label);
+    const rep = await analyse(all, sources.join(' + '));
     $('out').value = rep;
     status('Rapport prêt (' + rep.length + ' caractères). Copie-le et colle-le à Claude.', 'ok');
   } catch (err) { status('Erreur : ' + err.message, 'warn'); }
 }
 
-$('pickDir').addEventListener('change', e => {
+for (const id of ['pickDir', 'pickZip']) {
+  const inp = $(id);
+  inp.addEventListener('click', () => log('Sélecteur de fichiers ouvert, en attente de Chrome…'));
+  inp.addEventListener('cancel', () => log('Sélection annulée (ou Chrome n\'a rien transmis).'));
+}
+$('pickDir').addEventListener('change', async e => {
   const files = e.target.files;
-  const hasPaths = files.length && files[0].webkitRelativePath;
-  run(dirEntries(files), hasPaths ? 'dossier' : 'fichiers choisis un par un (pas de chemins)');
+  log('Chrome a rendu la main : ' + files.length + ' fichiers.');
+  const first = files.length ? (files[0].webkitRelativePath || files[0].name) : '';
+  const top = first.includes('/') ? first.split('/')[0] : 'fichiers sans chemin';
+  try { await run(dirEntries(files), 'dossier « ' + top + ' »'); } finally { e.target.value = ''; }
 });
 $('pickZip').addEventListener('change', async e => {
-  const f = e.target.files[0]; if (!f) return;
+  const f = e.target.files[0]; if (!f) { log('Aucun zip reçu.'); return; }
   status('Lecture du zip ' + f.name + ' (' + fmt(f.size) + ')…');
-  try { run(await zipEntries(f), 'zip ' + f.name + ' (' + fmt(f.size) + ')'); }
+  try { await run(await zipEntries(f), 'zip ' + f.name + ' (' + fmt(f.size) + ')'); }
   catch (err) { status('Erreur : ' + err.message, 'warn'); }
+  finally { e.target.value = ''; }
 });
+$('reset').addEventListener('click', () => { all = []; sources.length = 0; $('out').value = 'Le rapport apparaîtra ici.'; status('Tout est effacé. Tu peux recommencer.'); });
 $('copy').addEventListener('click', () => {
   const t = $('out');
+  if (!t.value.includes('Fin du rapport')) {
+    const jr = 'Pas encore de rapport. Journal de la page :\n' + logEl.textContent;
+    t.value = jr;
+  }
   const done = ok => { $('copied').textContent = ok ? 'Copié.' : 'Sélectionne le texte et copie-le à la main.'; };
   try {
     navigator.clipboard.writeText(t.value).then(() => done(true), () => { t.focus(); t.select(); done(false); });
